@@ -180,6 +180,9 @@ alongside `mutateR`.
 > - [*Drosophila melanogaster*
 >   (dm6)](https://doi.org/doi:10.18129/B9.bioc.BSgenome.Dmelanogaster.UCSC.dm6)
 >
+> - [*Caenorhabditis elegans*
+>   (ce11)](https://bioconductor.org/packages/release/data/annotation/html/BSgenome.Celegans.UCSC.ce11.html)
+>
 > You can also see all genomes currently available through `BSgenome` by
 > running `BSgenome::available.genomes()`.
 

@@ -50,7 +50,7 @@ This type of deletion can be achieved by simultaneously targeting two sites in t
 The `mutateR` package consists of the following ordered functions:
 
 | Step | Function | Functionality |
-|------------------|---------------------------|---------------------------|
+|-------------------|---------------------------|---------------------------|
 | 1 | `get_gene_info()` | Query Ensembl for gene and transcript metadata. |
 | 2 | `get_exon_structures()` | Retrieve exon coordinates and phase metadata. |
 | 3 | `find_cas9_sites()`/`find_cas12a_sites()` | Identify nuclease recognition sites. |
@@ -89,6 +89,8 @@ Running `mutateR` requires only installation of the package itself, and that you
 > -   [zebrafish (danRer11)](https://doi.org/doi:10.18129/B9.bioc.BSgenome.Drerio.UCSC.danRer11),
 >
 > -   [*Drosophila melanogaster* (dm6)](https://doi.org/doi:10.18129/B9.bioc.BSgenome.Dmelanogaster.UCSC.dm6)
+>
+> -   [*Caenorhabditis elegans* (ce11)](https://bioconductor.org/packages/release/data/annotation/html/BSgenome.Celegans.UCSC.ce11.html)
 >
 > You can also see all genomes currently available through `BSgenome` by running `BSgenome::available.genomes()`.
 
