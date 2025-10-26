@@ -1,7 +1,7 @@
 mutateR
 ================
 Alon M Douek
-2025-10-26
+2025-10-27
 
 - [Overview](#overview)
   - [Background](#background)
@@ -1856,7 +1856,8 @@ useful information yet.
 If a PTC occurs in the terminal exon of a gene, the PTC-bearing
 transcript is unlikely to induce NMD and subsequent compensation (an
 example of such an allele is the *sgsh<sup>Δex5−6</sup>* zebrafish
-mutant in <a href="#0" style="font-size: 11pt;"
+mutant in <a href="https://www.mdpi.com/1422-0067/22/11/5948"
+style="font-size: 11pt;"
 title="An Engineered sgsh Mutant Zebrafish Recapitulates Molecular and Behavioural Pathobiology of Sanfilippo Syndrome A/MPS IIIA">Douek
 et al., IJMS (2021)</a>). `mutateR` factors in predicted terminal exon
 PTCs when scanning for tolerated deletions, and flags these cases in the

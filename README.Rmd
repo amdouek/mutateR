@@ -225,7 +225,7 @@ There is a basic plotting mode currently implemented for this type of gene, thou
 
 #### Terminal exon PTCs
 
-If a PTC occurs in the terminal exon of a gene, the PTC-bearing transcript is unlikely to induce NMD and subsequent compensation (an example of such an allele is the *sgsh^Δex5−6^* zebrafish mutant in [Douek et al., IJMS (2021)](#0 "An Engineered sgsh Mutant Zebrafish Recapitulates Molecular and Behavioural Pathobiology of Sanfilippo Syndrome A/MPS IIIA"){style="font-size: 11pt;"}). `mutateR` factors in predicted terminal exon PTCs when scanning for tolerated deletions, and flags these cases in the `run_mutateR` output in the `$pairs` dataframe, under the `terminal_exon_case` column.
+If a PTC occurs in the terminal exon of a gene, the PTC-bearing transcript is unlikely to induce NMD and subsequent compensation (an example of such an allele is the *sgsh^Δex5−6^* zebrafish mutant in [Douek et al., IJMS (2021)](https://www.mdpi.com/1422-0067/22/11/5948 "An Engineered sgsh Mutant Zebrafish Recapitulates Molecular and Behavioural Pathobiology of Sanfilippo Syndrome A/MPS IIIA"){style="font-size: 11pt;"}). `mutateR` factors in predicted terminal exon PTCs when scanning for tolerated deletions, and flags these cases in the `run_mutateR` output in the `$pairs` dataframe, under the `terminal_exon_case` column.
 
 ## Manual function execution
 
