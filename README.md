@@ -93,11 +93,11 @@ mutations that we can generate.
 
 If we delete parts of a gene that correspond to functional domains of
 the encoded protein, but maintain the original reading frame (such that
-there is no PTC**\***), we are left with a stably-expressed, truncated
+there is no PTC), we are left with a stably-expressed, truncated
 mutant transcript that does not encode a functional protein but also
 does not induce transcriptional adaptation via NMD.
 
-> *\*Note*: There is nuance to NMD induction. For example, PTCs are much
+> *Note*: There is nuance to NMD induction. For example, PTCs are much
 > better tolerated (*i.e.*, do not induce NMD) if they occur in the
 > transcript’s terminal exon. For an excellent quantitative study of NMD
 > induction relative to transcript PTC position, please see [Lindeboom,
