@@ -35,12 +35,12 @@ domain annotation, and a logical \code{recommended} flag.
 For each \emph{phase‑compatible} exon pair (E5′, E3′),
 gRNAs are selected from the immediately flanking exons
 (E5′ + 1 and E3′ – 1).
-
+}
+\details{
 The output merges each gRNA pair’s protospacer/PAM sequences with the
 corresponding on‑target scores retrieved directly from the nested
 \code{ontarget_score} data.frames in the GRanges metadata.
-}
-\details{
+
 Each 30‑nt scoring sequence is internally trimmed by removing the
 first 4 and last 6 bases (3‑nt PAM + 3‑nt flank) to recover the
 20‑nt protospacer used for matching.

@@ -12,7 +12,8 @@ run_mutateR(
   transcript_id = NULL,
   score_method = NULL,
   top_n = 10,
-  quiet = FALSE
+  quiet = FALSE,
+  plot_mode = c("heat", "arc")
 )
 }
 \arguments{
@@ -32,6 +33,8 @@ Cas9: "ruleset1", "azimuth", "deephf";  Cas12a: "deepcpf1".}
 \item{top_n}{Integer. Number of top recommended pairs to plot (default 10; NULL = all).}
 
 \item{quiet}{Logical. Suppress intermediate messages (default FALSE).}
+
+\item{plot_mode}{Character. One of "heat" (default) or "arc". Passed to \code{plot_grna_design()}}
 }
 \value{
 A named list with elements:

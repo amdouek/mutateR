@@ -9,7 +9,8 @@ plot_grna_design(
   pairs_df = NULL,
   transcript_id = "Transcript",
   gene_symbol = NULL,
-  top_n = NULL
+  top_n = NULL,
+  mode = c("heat", "arc")
 )
 }
 \arguments{
@@ -19,8 +20,10 @@ plot_grna_design(
 
 \item{transcript_id}{Character transcript/gene label for the title.}
 
-\item{top_n}{Integer number of recommended pairs to display.
+\item{top_n}{Integer number of recommended pairs to display - arc mode only.
 Default NULL (shows all recommended pairs).}
+
+\item{mode}{Character, one of "heat" (default) or "arc".}
 }
 \value{
 A ggplot object

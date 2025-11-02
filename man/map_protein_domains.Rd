@@ -2,29 +2,22 @@
 % Please edit documentation in R/map_protein_domains.R
 \name{map_protein_domains}
 \alias{map_protein_domains}
-\title{Map protein domain annotations to exons}
+\title{Map protein domain annotations to exons (Pfam or InterPro, Ensembl ≥115‑compatible)}
 \usage{
-map_protein_domains(transcript_id, species)
+map_protein_domains(transcript_id, species, source = c("interpro", "pfam"))
 }
 \arguments{
 \item{transcript_id}{Character. Ensembl transcript ID.}
 
 \item{species}{Character. Ensembl species short name (e.g., "hsapiens").}
+
+\item{source}{Character. Either "interpro" (default) or "pfam".}
 }
 \value{
-A data.frame with columns:
-\itemize{
-\item ensembl_exon_id
-\item exon_rank
-\item domain_source ("InterPro")
-\item domain_id
-\item domain_desc (InterPro annotation)
-\item domain_start / domain_end (amino acid coordinates)
-}
+data.frame with exon‑specific domain annotations.
 }
 \description{
-Retrieves annotated protein domains (currently InterPro only - N.B. this will be changed) for a given
-Ensembl transcript, including amino acid coordinates, and assigns them to the
-exons of the transcript. Each overlapping domain annotation is returned once,
-with duplicates removed.
+Retrieves annotated Pfam or InterPro domains for a given Ensembl transcript.
+Domain amino‑acid coordinates are mapped to the specific exons they overlap,
+yielding biologically faithful exon–domain assignments.
 }

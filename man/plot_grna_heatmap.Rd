@@ -5,7 +5,12 @@
 \title{Plot exon‑phase compatibility as a discrete heatmap
 (helper function for large-gene visualisation)}
 \usage{
-plot_grna_heatmap(exon_gr, transcript_id = "Transcript", gene_symbol = NULL)
+plot_grna_heatmap(
+  exon_gr,
+  transcript_id = "Transcript",
+  gene_symbol = NULL,
+  pairs_df = NULL
+)
 }
 \arguments{
 \item{exon_gr}{GRanges from get_exon_structures(output="GRanges")}
@@ -13,6 +18,9 @@ plot_grna_heatmap(exon_gr, transcript_id = "Transcript", gene_symbol = NULL)
 \item{transcript_id}{Character. Transcript label.}
 
 \item{gene_symbol}{Character. Gene label.}
+
+\item{pairs_df}{Optional data.frame of gRNA‑pair information
+(currently unused but accepted for forward compatibility).}
 }
 \value{
 ggplot object
