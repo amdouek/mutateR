@@ -1,7 +1,7 @@
 mutateR
 ================
 Alon M Douek
-2025-10-27
+2025-11-03
 
 - [Overview](#overview)
   - [Background](#background)
@@ -93,11 +93,11 @@ mutations that we can generate.
 
 If we delete parts of a gene that correspond to functional domains of
 the encoded protein, but maintain the original reading frame (such that
-there is no PTC), we are left with a stably-expressed, truncated
+there is no PTC**\***), we are left with a stably-expressed, truncated
 mutant transcript that does not encode a functional protein but also
 does not induce transcriptional adaptation via NMD.
 
-> *Note*: There is nuance to NMD induction. For example, PTCs are much
+> *\*Note*: There is nuance to NMD induction. For example, PTCs are much
 > better tolerated (*i.e.*, do not induce NMD) if they occur in the
 > transcript’s terminal exon. For an excellent quantitative study of NMD
 > induction relative to transcript PTC position, please see [Lindeboom,
@@ -207,8 +207,8 @@ tp53_res <- run_mutateR(
   genome = BSgenome.Hsapiens.UCSC.hg38,
   nuclease = "Cas9",
   score_method = 'ruleset1',
-  top_n = NULL,
   quiet = FALSE,
+  plot_mode = 'heat'
   )
 #> Retrieving gene/transcript information...
 #> Using transcript: ENST00000269305 for gene: TP53
@@ -223,8 +223,11 @@ tp53_res <- run_mutateR(
 #> Scored 399 guides using ruleset1.
 #> Assembling valid gRNA pairs for TP53 ...
 #> Assembling gRNA pairs for exon‑flanking deletions...
-#> Flattening on‑target scores from GRanges ...
+#> Flattening on-target scores from GRanges ...
+#> Retrieving InterPro domain annotations from Ensembl Genes mart...
 #> Generated 2664 candidate exon‑flanking gRNA pairs.
+#> Plotting exon phase compatibility and gRNA pairs...
+#> Retrieving Pfam domain annotations from Ensembl Genes mart...
 #> mutateR pipeline completed for TP53, finding 2664 gRNA pairs.
 ```
 
@@ -419,9 +422,8 @@ TGG
 
 <td style="text-align:left;">
 
-p53_tumour_suppressor; p53_transactivation_domain; p53_TAD2;
-p53/RUNT-type_TF_DNA-bd_sf; p53-like_TF_DNA-bd_sf; p53_DNA-bd;
-p53_tetrameristn; p53_tetramer_sf
+p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
+p53/RUNT-type_TF_DNA-bd_sf
 </td>
 
 <td style="text-align:left;">
@@ -505,9 +507,8 @@ TGG
 
 <td style="text-align:left;">
 
-p53_tumour_suppressor; p53_transactivation_domain; p53_TAD2;
-p53/RUNT-type_TF_DNA-bd_sf; p53-like_TF_DNA-bd_sf; p53_DNA-bd;
-p53_tetrameristn; p53_tetramer_sf
+p53_tumour_suppressor; p53-like_TF_DNA-bd_sf; p53_DNA-bd;
+p53/RUNT-type_TF_DNA-bd_sf
 </td>
 
 <td style="text-align:left;">
@@ -591,9 +592,8 @@ TGG
 
 <td style="text-align:left;">
 
-p53_tumour_suppressor; p53_transactivation_domain; p53_TAD2;
-p53/RUNT-type_TF_DNA-bd_sf; p53-like_TF_DNA-bd_sf; p53_DNA-bd;
-p53_tetrameristn; p53_tetramer_sf
+p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
+p53/RUNT-type_TF_DNA-bd_sf
 </td>
 
 <td style="text-align:left;">
@@ -677,9 +677,8 @@ TGG
 
 <td style="text-align:left;">
 
-p53_tumour_suppressor; p53_transactivation_domain; p53_TAD2;
-p53/RUNT-type_TF_DNA-bd_sf; p53-like_TF_DNA-bd_sf; p53_DNA-bd;
-p53_tetrameristn; p53_tetramer_sf
+p53_tumour_suppressor; p53-like_TF_DNA-bd_sf; p53_DNA-bd;
+p53/RUNT-type_TF_DNA-bd_sf
 </td>
 
 <td style="text-align:left;">
@@ -763,9 +762,8 @@ TGG
 
 <td style="text-align:left;">
 
-p53_tumour_suppressor; p53_transactivation_domain; p53_TAD2;
-p53/RUNT-type_TF_DNA-bd_sf; p53-like_TF_DNA-bd_sf; p53_DNA-bd;
-p53_tetrameristn; p53_tetramer_sf
+p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
+p53/RUNT-type_TF_DNA-bd_sf
 </td>
 
 <td style="text-align:left;">
@@ -958,9 +956,8 @@ AGG
 
 <td style="text-align:left;">
 
-p53_tumour_suppressor; p53_transactivation_domain; p53_TAD2;
-p53/RUNT-type_TF_DNA-bd_sf; p53-like_TF_DNA-bd_sf; p53_DNA-bd;
-p53_tetrameristn; p53_tetramer_sf
+p53-like_TF_DNA-bd_sf; p53_tumour_suppressor; p53_DNA-bd;
+p53/RUNT-type_TF_DNA-bd_sf
 </td>
 
 <td style="text-align:left;">
@@ -1044,9 +1041,8 @@ GGG
 
 <td style="text-align:left;">
 
-p53_tumour_suppressor; p53_transactivation_domain; p53_TAD2;
-p53/RUNT-type_TF_DNA-bd_sf; p53-like_TF_DNA-bd_sf; p53_DNA-bd;
-p53_tetrameristn; p53_tetramer_sf
+p53-like_TF_DNA-bd_sf; p53_tumour_suppressor; p53_DNA-bd;
+p53/RUNT-type_TF_DNA-bd_sf
 </td>
 
 <td style="text-align:left;">
@@ -1130,9 +1126,8 @@ GGG
 
 <td style="text-align:left;">
 
-p53_tumour_suppressor; p53_transactivation_domain; p53_TAD2;
-p53/RUNT-type_TF_DNA-bd_sf; p53-like_TF_DNA-bd_sf; p53_DNA-bd;
-p53_tetrameristn; p53_tetramer_sf
+p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
+p53/RUNT-type_TF_DNA-bd_sf; p53_tetrameristn; p53_tetramer_sf
 </td>
 
 <td style="text-align:left;">
@@ -1216,9 +1211,8 @@ GGG
 
 <td style="text-align:left;">
 
-p53_tumour_suppressor; p53_transactivation_domain; p53_TAD2;
-p53/RUNT-type_TF_DNA-bd_sf; p53-like_TF_DNA-bd_sf; p53_DNA-bd;
-p53_tetrameristn; p53_tetramer_sf
+p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
+p53/RUNT-type_TF_DNA-bd_sf; p53_tetrameristn; p53_tetramer_sf
 </td>
 
 <td style="text-align:left;">
@@ -1302,9 +1296,8 @@ GGG
 
 <td style="text-align:left;">
 
-p53_tumour_suppressor; p53_transactivation_domain; p53_TAD2;
-p53/RUNT-type_TF_DNA-bd_sf; p53-like_TF_DNA-bd_sf; p53_DNA-bd;
-p53_tetrameristn; p53_tetramer_sf
+p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
+p53/RUNT-type_TF_DNA-bd_sf; p53_tetrameristn; p53_tetramer_sf
 </td>
 
 <td style="text-align:left;">
@@ -1363,65 +1356,60 @@ threshold).
 
 ##### Visualisation
 
-`mutateR` also produces a basic visualisation for both
-phase-compatibility of non-contiguous exons as well as the exons to be
-targeted by recommended gRNA pairs (the nature of this visualisation
-will change once I figure out how to make it less shit):
+`mutateR` also produces a basic visualisation for exon
+phase-compatibility, by default a heatmap.
 
 ``` r
 tp53_res$plot
 ```
 
-![](README_files/figure-gfm/mutateR_plot-1.png)<!-- -->
-
-For larger genes (defined - somewhat arbitrarily - here as \>12 exons),
-the above arc-based visualisation gets quite cluttered. If a transcript
-with \>12 exons is used to run `run_mutateR()`, the visualisation type
-will automatically switch to a heatmap/matrix-based output. This might
-become the default mode in future, if I can make it more informative
-vis-a-vis recommended gRNA pairs (TBC).
-
-To give an example of the above, let’s run `mutateR` with a sufficiently
-large gene - in this case, zebrafish *frmpd3* (17 exons total, of which
-the first two contain 5\` UTR):
-
-``` r
-library(BSgenome.Drerio.UCSC.danRer11)
-
-frmpd3 <- run_mutateR(gene_id = 'frmpd3',
-                     species = 'drerio',
-                     genome = BSgenome.Drerio.UCSC.danRer11,
-                     nuclease = 'Cas9',
-                     score_method = 'ruleset1')
-#> Retrieving gene/transcript information...
-#> Using transcript: ENSDART00000110004 for gene: frmpd3
-#> Locating Cas9 target sites...
-#> Scoring gRNAs using model: ruleset1
-#> Computing on‑target scores using ruleset1 model...
-#> Re‑orienting 435 guides so PAM = NGG at positions 26–27.
-#> PAM triplet distribution (positions 25–27):
-#> 
-#> AGG CGG GGG TGG 
-#> 297  61 200 317
-#> Scored 875 guides using ruleset1.
-#> Assembling valid gRNA pairs for frmpd3 ...
-#> Assembling gRNA pairs for exon‑flanking deletions...
-#> Flattening on‑target scores from GRanges ...
-#> Generated 3613 candidate exon‑flanking gRNA pairs.
-#> Detected large gene (>12 exons); switching to heatmap mode.
-#> mutateR pipeline completed for frmpd3, finding 3613 gRNA pairs.
-```
-
-``` r
-frmpd3$plot
-```
-
-![](README_files/figure-gfm/mutateR_plot2-1.png)<!-- -->
+![](README_files/figure-gfm/mutateR_plot_heatmap-1.png)<!-- -->
 
 The x-axis represents the 5-prime exon, and the y-axis the three-prime
 exon, to represent a given exon pair. UTR-containing exons are in red,
 contiguous exons in green, while non-contiguous phase-compatible exons
 are in yellow. All incompatible exon pairs are blue.
+
+Domain annotations from Pfam are provided in a secondary plot element
+below the heatmap x-axis to assist you in selecting regions should you
+wish to ablate specific functional domains.
+
+> A future release will allow interactive plotting to represent
+> visualisation and easy retrieval of desired gRNA pairs directly from
+> the plot.
+
+The partially deprecated arc-based plotting mode can be accessed by
+specifying `"arc"` in the `plot_mode` parameter in `run_mutateR()`. It
+will remain, for now, the default plotting mode for small-gene edge
+cases (described below).
+
+This visualisation mode might be refined in future (if I feel like it),
+but presently I will be focusing my effort on improving the heatmap.
+
+``` r
+tp53_arc <- run_mutateR(
+  gene_id = "TP53",
+  species = "hsapiens",
+  genome = BSgenome.Hsapiens.UCSC.hg38,
+  nuclease = "Cas9",
+  score_method = 'ruleset1',
+  top_n = NULL,
+  quiet = TRUE,
+  plot_mode = 'arc'
+  )
+#> 
+#> AGG CGG GGG TGG 
+#> 102  36 136 125
+#> Assembling gRNA pairs for exon‑flanking deletions...
+#> Flattening on-target scores from GRanges ...
+#> Retrieving InterPro domain annotations from Ensembl Genes mart...
+#> Generated 2664 candidate exon‑flanking gRNA pairs.
+#> Plotting exon phase compatibility and gRNA pairs...
+
+tp53_arc$plot
+```
+
+![](README_files/figure-gfm/mutateR_plot_arc-1.png)<!-- -->
 
 ##### Other data levels
 
@@ -1506,6 +1494,8 @@ Here’s an example with zebrafish *opn4.1*, which contains a single,
 large coding exon):
 
 ``` r
+library(BSgenome.Drerio.UCSC.danRer11)
+
 opn4.1 <- run_mutateR(gene_id = 'opn4.1',
                      species = 'drerio',
                      genome = BSgenome.Drerio.UCSC.danRer11,
@@ -1528,7 +1518,7 @@ opn4.1 <- run_mutateR(gene_id = 'opn4.1',
 #> Generated 41041 intragenic deletion pairs; 435 meet score cutoff.
 #> Returning 435 recommended intragenic pairs.
 #> Detected intragenic assembly mode (≤2 exons).
-#> Plotting intragenic deletion mode.
+#> Plotting exon phase compatibility and gRNA pairs...
 #> mutateR pipeline completed for opn4.1, finding 435 gRNA pairs.
 ```
 
@@ -2150,7 +2140,7 @@ tp53_cas9_gRNAs_scored
 
 - All `crisprScore` scoring methods
 
-- Visualisation improvements
+- Visualisation improvements – in progress
 
 - Workflow for handling of intronic target sequences
 
@@ -2201,7 +2191,7 @@ sessionInfo()
 #> [17] fastmap_1.2.0               dbplyr_2.5.1               
 #> [19] labeling_0.4.3              Rsamtools_2.25.3           
 #> [21] rmarkdown_2.30              UCSC.utils_1.5.0           
-#> [23] bit_4.6.0                   xfun_0.53                  
+#> [23] bit_4.6.0                   xfun_0.54                  
 #> [25] randomForest_4.7-1.2        cachem_1.1.0               
 #> [27] jsonlite_2.0.0              progress_1.2.3             
 #> [29] blob_1.2.4                  DelayedArray_0.35.3        
@@ -2217,7 +2207,7 @@ sessionInfo()
 #> [49] Biobase_2.69.1              withr_3.0.2                
 #> [51] KEGGREST_1.49.1             S7_0.2.0                   
 #> [53] evaluate_1.0.5              crisprScoreData_1.13.0     
-#> [55] BiocFileCache_2.99.6        xml2_1.4.0                 
+#> [55] BiocFileCache_2.99.6        xml2_1.4.1                 
 #> [57] ExperimentHub_2.99.5        pillar_1.11.1              
 #> [59] BiocManager_1.30.26         filelock_1.0.3             
 #> [61] MatrixGenerics_1.21.0       crisprScore_1.13.1         
