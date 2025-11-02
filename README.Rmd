@@ -50,7 +50,7 @@ This type of deletion can be achieved by simultaneously targeting two sites in t
 The `mutateR` package consists of the following ordered functions:
 
 | Step | Function | Functionality |
-|----|----|----|
+|------------------------|------------------------|------------------------|
 | 1 | `get_gene_info()` | Query Ensembl for gene and transcript metadata. |
 | 2 | `get_exon_structures()` | Retrieve exon coordinates and phase metadata. |
 | 3 | `find_cas9_sites()`/`find_cas12a_sites()` | Identify nuclease recognition sites. |
@@ -112,8 +112,8 @@ tp53_res <- run_mutateR(
   genome = BSgenome.Hsapiens.UCSC.hg38,
   nuclease = "Cas9",
   score_method = 'ruleset1',
-  top_n = NULL,
   quiet = FALSE,
+  plot_mode = 'heat'
   )
 ```
 
@@ -156,31 +156,36 @@ Each 5-prime and 3-prime gRNA sequence also has corresponding `ontarget_score`, 
 
 ##### Visualisation
 
-`mutateR` also produces a basic visualisation for both phase-compatibility of non-contiguous exons as well as the exons to be targeted by recommended gRNA pairs (the nature of this visualisation will change once I figure out how to make it less shit):
+`mutateR` also produces a basic visualisation for exon phase-compatibility, by default a heatmap.
 
-```{r mutateR_plot, fig.width=8, fig.height=6}
+```{r mutateR_plot_heatmap, fig.width=10, fig.height=8}
 tp53_res$plot
 ```
 
-For larger genes (defined - somewhat arbitrarily - here as \>12 exons), the above arc-based visualisation gets quite cluttered. If a transcript with \>12 exons is used to run `run_mutateR()`, the visualisation type will automatically switch to a heatmap/matrix-based output. This might become the default mode in future, if I can make it more informative vis-a-vis recommended gRNA pairs (TBC).
-
-To give an example of the above, let's run `mutateR` with a sufficiently large gene - in this case, zebrafish *frmpd3* (17 exons total, of which the first two contain 5\` UTR):
-
-```{r}
-library(BSgenome.Drerio.UCSC.danRer11)
-
-frmpd3 <- run_mutateR(gene_id = 'frmpd3',
-                     species = 'drerio',
-                     genome = BSgenome.Drerio.UCSC.danRer11,
-                     nuclease = 'Cas9',
-                     score_method = 'ruleset1')
-```
-
-```{r mutateR_plot2, fig.width=8, fig.height=6}
-frmpd3$plot
-```
-
 The x-axis represents the 5-prime exon, and the y-axis the three-prime exon, to represent a given exon pair. UTR-containing exons are in red, contiguous exons in green, while non-contiguous phase-compatible exons are in yellow. All incompatible exon pairs are blue.
+
+Domain annotations from Pfam are provided in a secondary plot element below the heatmap x-axis to assist you in selecting regions should you wish to ablate specific functional domains.
+
+> A future release will allow interactive plotting to represent visualisation and easy retrieval of desired gRNA pairs directly from the plot.
+
+The partially deprecated arc-based plotting mode can be accessed by specifying `"arc"` in the `plot_mode` parameter in `run_mutateR()`. It will remain, for now, the default plotting mode for small-gene edge cases (described below).
+
+This visualisation mode might be refined in future (if I feel like it), but presently I will be focusing my effort on improving the heatmap.
+
+```{r mutateR_plot_arc, fig.width=10, fig.height=8}
+tp53_arc <- run_mutateR(
+  gene_id = "TP53",
+  species = "hsapiens",
+  genome = BSgenome.Hsapiens.UCSC.hg38,
+  nuclease = "Cas9",
+  score_method = 'ruleset1',
+  top_n = NULL,
+  quiet = TRUE,
+  plot_mode = 'arc'
+  )
+
+tp53_arc$plot
+```
 
 ##### Other data levels
 
@@ -209,6 +214,8 @@ Instead of computing exon phase compatibility (which isn't a factor for these ty
 Here's an example with zebrafish *opn4.1*, which contains a single, large coding exon):
 
 ```{r}
+library(BSgenome.Drerio.UCSC.danRer11)
+
 opn4.1 <- run_mutateR(gene_id = 'opn4.1',
                      species = 'drerio',
                      genome = BSgenome.Drerio.UCSC.danRer11,
@@ -286,7 +293,7 @@ tp53_cas9_gRNAs_scored
 
 -   All `crisprScore` scoring methods
 
--   Visualisation improvements
+-   Visualisation improvements – in progress
 
 -   Workflow for handling of intronic target sequences
 
