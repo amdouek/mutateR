@@ -19,6 +19,7 @@ plot_grna_design <- function(exon_gr,
                              pairs_df = NULL,
                              transcript_id = "Transcript",
                              gene_symbol = NULL,
+                             species,
                              top_n = NULL,
                              mode = c('heat', 'arc')) {
   library(ggplot2); library(dplyr); library(tibble); library(RColorBrewer)
@@ -36,6 +37,7 @@ plot_grna_design <- function(exon_gr,
       plot_grna_heatmap(exon_gr = exon_gr,
                         transcript_id = transcript_id,
                         gene_symbol = gene_symbol,
+                        species = species,
                         pairs_df = pairs_df)
     )
   }

@@ -1,7 +1,7 @@
 mutateR
 ================
 Alon M Douek
-2025-11-03
+2025-11-24
 
 - [Overview](#overview)
   - [Background](#background)
@@ -33,7 +33,9 @@ It identifies pairs of non-contiguous exons in a given transcript that
 are phase-compatible with each other (*i.e.*, pairs of exons that do not
 normally neighbour each other in the transcript, but the 5’ exon ends in
 the same reading frame position (0, 1, or 2) as the 3’ exon begins
-with).
+with), then detects gRNAs in each exon that facilitate their deletion
+such that the resulting mutant allele preserves the original reading
+frame.
 
 ### Background
 
@@ -2169,8 +2171,8 @@ sessionInfo()
 #> 
 #> other attached packages:
 #>  [1] BSgenome.Drerio.UCSC.danRer11_1.4.2 RColorBrewer_1.1-3                 
-#>  [3] tibble_3.3.0                        ggplot2_4.0.0                      
-#>  [5] purrr_1.1.0                         dplyr_1.1.4                        
+#>  [3] tibble_3.3.0                        ggplot2_4.0.1                      
+#>  [5] purrr_1.2.0                         dplyr_1.1.4                        
 #>  [7] BSgenome.Hsapiens.UCSC.hg38_1.4.5   BSgenome_1.77.2                    
 #>  [9] rtracklayer_1.69.1                  BiocIO_1.19.0                      
 #> [11] Biostrings_2.77.2                   XVector_0.49.1                     
@@ -2184,9 +2186,9 @@ sessionInfo()
 #>  [3] httr2_1.2.1                 biomaRt_2.65.16            
 #>  [5] rlang_1.1.6                 magrittr_2.0.4             
 #>  [7] matrixStats_1.5.0           compiler_4.5.1             
-#>  [9] RSQLite_2.4.3               dir.expiry_1.17.0          
+#>  [9] RSQLite_2.4.4               dir.expiry_1.17.0          
 #> [11] png_0.1-8                   systemfonts_1.3.1          
-#> [13] vctrs_0.6.5                 stringr_1.5.2              
+#> [13] vctrs_0.6.5                 stringr_1.6.0              
 #> [15] pkgconfig_2.0.3             crayon_1.5.3               
 #> [17] fastmap_1.2.0               dbplyr_2.5.1               
 #> [19] labeling_0.4.3              Rsamtools_2.25.3           
@@ -2197,7 +2199,7 @@ sessionInfo()
 #> [29] blob_1.2.4                  DelayedArray_0.35.3        
 #> [31] BiocParallel_1.43.4         parallel_4.5.1             
 #> [33] prettyunits_1.2.0           R6_2.6.1                   
-#> [35] stringi_1.8.7               reticulate_1.44.0          
+#> [35] stringi_1.8.7               reticulate_1.44.1          
 #> [37] Rcpp_1.1.0                  SummarizedExperiment_1.39.2
 #> [39] knitr_1.50                  Matrix_1.7-4               
 #> [41] tidyselect_1.2.1            rstudioapi_0.17.1          
@@ -2205,23 +2207,23 @@ sessionInfo()
 #> [45] yaml_2.3.10                 codetools_0.2-20           
 #> [47] curl_7.0.0                  lattice_0.22-7             
 #> [49] Biobase_2.69.1              withr_3.0.2                
-#> [51] KEGGREST_1.49.1             S7_0.2.0                   
+#> [51] KEGGREST_1.49.1             S7_0.2.1                   
 #> [53] evaluate_1.0.5              crisprScoreData_1.13.0     
-#> [55] BiocFileCache_2.99.6        xml2_1.4.1                 
+#> [55] BiocFileCache_2.99.6        xml2_1.5.0                 
 #> [57] ExperimentHub_2.99.5        pillar_1.11.1              
-#> [59] BiocManager_1.30.26         filelock_1.0.3             
+#> [59] BiocManager_1.30.27         filelock_1.0.3             
 #> [61] MatrixGenerics_1.21.0       crisprScore_1.13.1         
 #> [63] RCurl_1.98-1.17             BiocVersion_3.22.0         
 #> [65] hms_1.1.4                   scales_1.4.0               
 #> [67] glue_1.8.0                  tools_4.5.1                
 #> [69] AnnotationHub_3.99.6        GenomicAlignments_1.45.4   
-#> [71] XML_3.99-0.19               grid_4.5.1                 
+#> [71] XML_3.99-0.20               grid_4.5.1                 
 #> [73] AnnotationDbi_1.71.1        basilisk_1.21.5            
 #> [75] restfulr_0.0.16             cli_3.6.5                  
 #> [77] rappdirs_0.3.3              kableExtra_1.4.0           
 #> [79] textshaping_1.0.4           viridisLite_0.4.2          
 #> [81] S4Arrays_1.9.1              svglite_2.2.2              
-#> [83] gtable_0.3.6                digest_0.6.37              
+#> [83] gtable_0.3.6                digest_0.6.39              
 #> [85] SparseArray_1.9.1           rjson_0.2.23               
 #> [87] farver_2.1.2                memoise_2.0.1              
 #> [89] htmltools_0.5.8.1           lifecycle_1.0.4            
