@@ -9,6 +9,7 @@ plot_grna_heatmap(
   exon_gr,
   transcript_id = "Transcript",
   gene_symbol = NULL,
+  species,
   pairs_df = NULL
 )
 }

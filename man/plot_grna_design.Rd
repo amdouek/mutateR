@@ -9,6 +9,7 @@ plot_grna_design(
   pairs_df = NULL,
   transcript_id = "Transcript",
   gene_symbol = NULL,
+  species,
   top_n = NULL,
   mode = c("heat", "arc")
 )

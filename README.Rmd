@@ -19,7 +19,7 @@ knitr::opts_chunk$set(
 
 `mutateR` streamlines design of frame-aware CRISPR/Cas-mediated deletions.
 
-It identifies pairs of non-contiguous exons in a given transcript that are phase-compatible with each other (*i.e.*, pairs of exons that do not normally neighbour each other in the transcript, but the 5' exon ends in the same reading frame position (0, 1, or 2) as the 3' exon begins with).
+It identifies pairs of non-contiguous exons in a given transcript that are phase-compatible with each other (*i.e.*, pairs of exons that do not normally neighbour each other in the transcript, but the 5' exon ends in the same reading frame position (0, 1, or 2) as the 3' exon begins with), then detects gRNAs in each exon that facilitate their deletion such that the resulting mutant allele preserves the original reading frame.
 
 ### Background
 
@@ -50,7 +50,7 @@ This type of deletion can be achieved by simultaneously targeting two sites in t
 The `mutateR` package consists of the following ordered functions:
 
 | Step | Function | Functionality |
-|------------------------|------------------------|------------------------|
+|----|----|----|
 | 1 | `get_gene_info()` | Query Ensembl for gene and transcript metadata. |
 | 2 | `get_exon_structures()` | Retrieve exon coordinates and phase metadata. |
 | 3 | `find_cas9_sites()`/`find_cas12a_sites()` | Identify nuclease recognition sites. |

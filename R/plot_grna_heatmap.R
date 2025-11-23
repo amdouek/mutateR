@@ -12,6 +12,7 @@
 plot_grna_heatmap <- function(exon_gr,
                               transcript_id = "Transcript",
                               gene_symbol = NULL,
+                              species,
                               pairs_df = NULL) {
 
   suppressPackageStartupMessages({
@@ -60,12 +61,14 @@ plot_grna_heatmap <- function(exon_gr,
   )
 
   ## ----- 3. Retrieve domain annotations ------------------------------
-  species_guess <- attr(exon_gr, "species")
   domain_df <- tryCatch(
     map_protein_domains(transcript_id,
-                        if (is.null(species_guess)) "hsapiens" else species_guess,
+                        species = species,
                         source = "pfam"),
-    error = function(e) NULL
+    error = function(e) {
+      message("Domain retrieval failed for transcript ", transcript_id, ": ", e$message)
+      NULL
+    }
   )
 
   domain_plot_df <- data.frame()
@@ -104,7 +107,7 @@ plot_grna_heatmap <- function(exon_gr,
     ))
 
   ## ----- 5. Domain annotation layer ----------------------------------
-  if (nrow(domain_plot_df) > 0) {
+  if (!is.null(domain_plot_df) && nrow(domain_plot_df) > 0) {
     n_domains <- nrow(domain_plot_df)
 
     # vertical tracks (all below the heatmap)
@@ -120,33 +123,38 @@ plot_grna_heatmap <- function(exon_gr,
 
     # assign label placement: alternate above/below
     domain_plot_df$label_y <- ifelse(seq_len(n_domains) %% 2 == 1,
-                                     domain_plot_df$ymax + 0.1, # odd -> above
-                                     domain_plot_df$ymin - 0.1) # even -> below
+                                     domain_plot_df$ymax + 0.1,  # odd -> above
+                                     domain_plot_df$ymin - 0.1)  # even -> below
 
-    p_heat <- p_heat +
-      geom_rect(
-        data = domain_plot_df,
-        aes(xmin = exon_start - 0.45,
-            xmax = exon_end + 0.45,
-            ymin = ymin,
-            ymax = ymax),
-        inherit.aes = FALSE,
-        fill = domain_cols,
-        colour = "black",
-        linewidth = 0.25,
-        alpha = 0.85
-      ) +
-      geom_text(
-        data = domain_plot_df,
-        aes(x = (exon_start + exon_end)/2,
-            y = label_y,
-            label = domain_desc),
-        inherit.aes = FALSE,
-        size = 3.1,
-        fontface = "italic",
-        colour = "black"
-      ) +
-      expand_limits(y = min(domain_plot_df$ymin) - 0.3)
+    # ---- Added safety guard ----
+    if (nrow(domain_plot_df) > 0 && length(domain_cols) > 0) {
+      p_heat <- p_heat +
+        geom_rect(
+          data = domain_plot_df,
+          aes(xmin = exon_start - 0.45,
+              xmax = exon_end + 0.45,
+              ymin = ymin,
+              ymax = ymax),
+          inherit.aes = FALSE,
+          fill = domain_cols[seq_len(min(length(domain_cols), n_domains))],
+          colour = "black",
+          linewidth = 0.25,
+          alpha = 0.85
+        ) +
+        geom_text(
+          data = domain_plot_df,
+          aes(x = (exon_start + exon_end)/2,
+              y = label_y,
+              label = domain_desc),
+          inherit.aes = FALSE,
+          size = 3.1,
+          fontface = "italic",
+          colour = "black"
+        ) +
+        expand_limits(y = min(domain_plot_df$ymin) - 0.3)
+    }
+  } else {
+    message("No protein domain annotations available; displaying heatmap only.")
   }
 
   return(p_heat)

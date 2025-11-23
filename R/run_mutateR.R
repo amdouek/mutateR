@@ -153,6 +153,7 @@ run_mutateR <- function(gene_id,
       plot_obj <- plot_grna_design(exons_gr,
                                    pairs_df,
                                    gene_symbol = gene_symbol,
+                                   species = species,
                                    transcript_id = canonical_tx,
                                    top_n = top_n,
                                    mode = plot_mode)
