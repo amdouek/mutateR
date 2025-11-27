@@ -11,7 +11,8 @@ plot_grna_design(
   gene_symbol = NULL,
   species,
   top_n = NULL,
-  mode = c("heat", "arc")
+  mode = c("heat", "arc"),
+  interactive = FALSE
 )
 }
 \arguments{
@@ -25,6 +26,8 @@ plot_grna_design(
 Default NULL (shows all recommended pairs).}
 
 \item{mode}{Character, one of "heat" (default) or "arc".}
+
+\item{interactive}{Logical; default FALSE. If TRUE, launches an interactive plotly-based viewer allowing hover-over display of exon-pair and gRNA-pair data, multiple selection, and CSV export.}
 }
 \value{
 A ggplot object

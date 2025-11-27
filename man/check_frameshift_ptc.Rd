@@ -7,23 +7,16 @@
 check_frameshift_ptc(exon_info, exon_5p, exon_3p)
 }
 \arguments{
-\item{exon_info}{data.frame with \code{rank} and \code{exon_cds_length}
-(from get_exon_structures()).}
+\item{exon_info}{data.frame with \code{rank} and \code{exon_cds_length}}
 
 \item{exon_5p}{Integer. Upstream exon rank.}
 
 \item{exon_3p}{Integer. Downstream exon rank.}
 }
 \value{
-List with:
-\itemize{
-\item frameshift (TRUE if not divisible by 3)
-\item ptc_flag (TRUE if frameshift causes PTC in a non-terminal exon)
-\item terminal_exon_case (TRUE if frameshift results in PTC in the terminal exon)
-}
+List with frameshift (logical), ptc_flag (logical),
+terminal_exon_case (logical), and deleted_length (integer).
 }
 \description{
-Given exon structure and candidate exon pair, determine whether the
-resulting deletion would maintain reading frame or instead induce
-a premature termination codon (PTC).
+Assess if an deletion of exon(s) would cause a frameshift/PTC
 }

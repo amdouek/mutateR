@@ -12,6 +12,7 @@
 #' @param top_n         Integer number of recommended pairs to display - arc mode only.
 #'                      Default NULL (shows all recommended pairs).
 #' @param mode          Character, one of "heat" (default) or "arc".
+#' @param interactive Logical; default FALSE. If TRUE, launches an interactive plotly-based viewer allowing hover-over display of exon-pair and gRNA-pair data, multiple selection, and CSV export.
 #'
 #' @return A ggplot object
 #' @export
@@ -21,7 +22,8 @@ plot_grna_design <- function(exon_gr,
                              gene_symbol = NULL,
                              species,
                              top_n = NULL,
-                             mode = c('heat', 'arc')) {
+                             mode = c('heat', 'arc'),
+                             interactive = FALSE) {
   library(ggplot2); library(dplyr); library(tibble); library(RColorBrewer)
 
   mode <- match.arg(mode)

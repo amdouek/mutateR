@@ -13,7 +13,8 @@ run_mutateR(
   score_method = NULL,
   top_n = 10,
   quiet = FALSE,
-  plot_mode = c("heat", "arc")
+  plot_mode = c("heat", "arc"),
+  interactive = FALSE
 )
 }
 \arguments{
@@ -35,6 +36,8 @@ Cas9: "ruleset1", "azimuth", "deephf";  Cas12a: "deepcpf1".}
 \item{quiet}{Logical. Suppress intermediate messages (default FALSE).}
 
 \item{plot_mode}{Character. One of "heat" (default) or "arc". Passed to \code{plot_grna_design()}}
+
+\item{interactive}{Logical; default FALSE. Use interactive plotly-based viewer instead of static ggplot-based visualisation.}
 }
 \value{
 A named list with elements:

@@ -2,8 +2,8 @@ Package: mutateR
 Title: Identify Optimal Frame-Aware Sites for Cas Effector-Mediated Deletions
 Version: 0.0.1
 Depends: R (>= 4.2.0)
-Imports: biomaRt, GenomicRanges, IRanges, GenomeInfoDb, Biostrings, dplyr, ggplot2, tibble, RColorBrewer, crisprScore, httr
-Suggests: crisprDesign, GenomicFeatures, crisprBase, crisprBowtie, AnnotationHub, ensembldb, BSgenome, testthat (>= 3.0.0), knitr, rmarkdown, tidyr
+Imports: biomaRt, GenomicRanges, IRanges, GenomeInfoDb, Biostrings, dplyr, ggplot2, tibble, RColorBrewer, crisprScore, httr, plotly
+Suggests: crisprDesign, GenomicFeatures, crisprBase, crisprBowtie, AnnotationHub, ensembldb, BSgenome, testthat (>= 3.0.0), knitr, rmarkdown, tidyr, shiny, DT
 Authors@R: 
     person("Alon", "Douek", email = "Alon.Douek@monash.edu", role = c("aut", "cre"), comment = c(ORCID = "0000-0001-5739-3835"))
 Description: Tools to design and prioritise Cas9 and Cas12a guide RNA pairs that generate in-frame exon deletions compatible with the transcript reading frame, minimising NMD- or transcriptional compensation-related artefacts.

@@ -12,6 +12,7 @@
 #' @param top_n Integer. Number of top recommended pairs to plot (default 10; NULL = all).
 #' @param quiet Logical. Suppress intermediate messages (default FALSE).
 #' @param plot_mode Character. One of "heat" (default) or "arc". Passed to \code{plot_grna_design()}
+#' @param interactive Logical; default FALSE. Use interactive plotly-based viewer instead of static ggplot-based visualisation.
 #'
 #' @return A named list with elements:
 #'   - transcript_id
@@ -29,7 +30,9 @@ run_mutateR <- function(gene_id,
                         score_method = NULL,
                         top_n = 10,
                         quiet = FALSE,
-                        plot_mode = c("heat", "arc")) {
+                        plot_mode = c("heat", "arc"),
+                        interactive = FALSE) {
+
   suppressPackageStartupMessages({
     library(dplyr)
     library(purrr)
@@ -39,9 +42,8 @@ run_mutateR <- function(gene_id,
   nuclease <- match.arg(nuclease)
 
   if (!inherits(genome, "BSgenome"))
-    stop("Please supply a valid BSgenome object for the target species. \n Available genomes can be seen using BSgenome::available.genomes()")
+    stop("Please supply a valid BSgenome object. You can see which genomes are available using BSgenome::available.genomes()")
 
-  ## ----- Determine scoring model defaults -----
   if (is.null(score_method)) {
     score_method <- if (nuclease == "Cas9") "ruleset1" else "deepcpf1"
   }
@@ -51,8 +53,7 @@ run_mutateR <- function(gene_id,
   tx_info <- get_gene_info(gene_id, species)
 
   gene_symbol <- NA_character_
-  if (!is.null(tx_info$canonical) &&
-      "external_gene_name" %in% names(tx_info$canonical)) {
+  if (!is.null(tx_info$canonical) && "external_gene_name" %in% names(tx_info$canonical)) {
     gene_symbol <- unique(tx_info$canonical$external_gene_name)[1]
   } else if ("external_gene_name" %in% names(tx_info$all)) {
     gene_symbol <- unique(tx_info$all$external_gene_name)[1]
@@ -69,6 +70,17 @@ run_mutateR <- function(gene_id,
   ## ----- Step 2: Exon structures -----
   exons_gr <- get_exon_structures(canonical_tx, species, output = "GRanges")
 
+  # Helper for early returns
+  generate_early_plot <- function(pairs = NULL) {
+    if (interactive) {
+      plot_grna_interactive(exons_gr, pairs, transcript_id = canonical_tx,
+                            gene_symbol = gene_symbol, species = species)
+    } else {
+      plot_grna_design(exons_gr, pairs, transcript_id = canonical_tx,
+                       gene_symbol = gene_symbol, mode = plot_mode)
+    }
+  }
+
   ## ----- Step 3: Find gRNAs -----
   if (!quiet) message("Locating ", nuclease, " target sites...")
   if (nuclease == "Cas9")
@@ -78,15 +90,13 @@ run_mutateR <- function(gene_id,
 
   if (is.null(hits) || length(hits) == 0) {
     warning("No gRNA sites identified for ", gene_id, " / ", nuclease)
-    return(list(transcript_id = canonical_tx,
+    return(list(gene_id = gene_id,
+                gene_symbol = gene_symbol,
+                transcript_id = canonical_tx,
                 exons = exons_gr,
                 scored_grnas = NULL,
                 pairs = data.frame(),
-                plot = plot_grna_design(exons_gr,
-                                        NULL,
-                                        transcript_id = canonical_tx,
-                                        mode = plot_mode)
-                ))
+                plot = generate_early_plot(NULL)))
   }
 
   ## ----- Step 4: Calculate on-target gRNA scores -----
@@ -100,9 +110,7 @@ run_mutateR <- function(gene_id,
     mcols(scored_grnas)$ontarget_score <- NA_real_
   } else {
     if (quiet) {
-      suppressMessages({
-        scored_grnas <- score_grnas(hits, method = score_method)
-      })
+      suppressMessages({scored_grnas <- score_grnas(hits, method = score_method)})
     } else {
       scored_grnas <- score_grnas(hits, method = score_method)
     }
@@ -130,7 +138,7 @@ run_mutateR <- function(gene_id,
     }
   )
 
-  ## ----- Step 6: Detect intragenic mode & normalise output (for genes with >=2 exons) -----
+  ## ----- Step 6: Detect intragenic mode -----
   intragenic_mode <- FALSE
   if (is.list(pairs_df) && "pairs" %in% names(pairs_df)) {
     pairs_df <- pairs_df$pairs
@@ -141,22 +149,25 @@ run_mutateR <- function(gene_id,
   ## ----- Step 7: Plot generation -----
   plot_obj <- NULL
   try({
-    if (is.null(pairs_df) || (is.data.frame(pairs_df) && nrow(pairs_df) == 0)) {
+    plot_pairs <- if (is.null(pairs_df)) data.frame() else pairs_df
+
+    if (nrow(plot_pairs) == 0) {
       warning("No gRNA pairs met scoring/compatibility criteria.")
-      plot_obj <- plot_grna_design(exons_gr,
-                                   if (intragenic_mode) data.frame() else NULL,
-                                   gene_symbol = gene_symbol,
-                                   transcript_id = canonical_tx,
-                                   top_n = NULL,
-                                   mode = plot_mode)
+    }
+
+    if (interactive) {
+      plot_obj <- plot_grna_interactive(exons_gr,
+                                        plot_pairs,
+                                        transcript_id = canonical_tx,
+                                        gene_symbol = gene_symbol,
+                                        species = species)
     } else {
       plot_obj <- plot_grna_design(exons_gr,
-                                   pairs_df,
+                                   plot_pairs,
                                    gene_symbol = gene_symbol,
-                                   species = species,
                                    transcript_id = canonical_tx,
                                    top_n = top_n,
-                                   mode = plot_mode)
+                                   mode = plotmutater_mode)
     }
   }, silent = TRUE)
 
