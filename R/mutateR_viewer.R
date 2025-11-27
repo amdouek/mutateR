@@ -18,12 +18,12 @@ mutateR_viewer <- function(plot_obj) {
   if (inherits(plot_obj, "ggplot")) {
     stop("mutateR_viewer() requires an interactive plotly object.\n",
          "The provided object is a static ggplot (the default output of run_mutateR).\n",
-         "Please generate an interactive plot (e.g., using plot_grna_interactive(), or specifying interactive = TRUE in run_mutateR) before passing it to this viewer.",
+         "Please generate an interactive plot (e.g., specifying interactive = TRUE in run_mutateR) before passing it to this viewer.",
          call. = FALSE)
   }
 
   if (!inherits(plot_obj, "plotly")) {
-    stop("Input must be a 'plotly' object.", call. = FALSE)
+    stop("Input must be a plotly object.", call. = FALSE)
   }
 
   pairs_df <- attr(plot_obj, "pairs_data")
@@ -41,7 +41,6 @@ mutateR_viewer <- function(plot_obj) {
         shiny::sidebarPanel(
           width = 3,
           shiny::h4("Selection"),
-          # Changed to htmlOutput to support line breaks
           shiny::htmlOutput("sel_summary"),
           shiny::hr(),
           shiny::helpText("1. Click a cell in the heatmap."),
@@ -89,25 +88,24 @@ mutateR_viewer <- function(plot_obj) {
         if (nrow(pairs_df) > 0) {
           sub_df <- pairs_df %>%
             dplyr::filter(upstream_pair == e5, downstream_pair == e3) %>%
-            dplyr::arrange(dplyr::desc((ontarget_score_5p + ontarget_score_3p)/2))
+            dplyr::arrange(dplyr::desc((ontarget_score_5p + ontarget_score_3p)/2)) # Currently takes an average, bit inelegant -- revise this
           selected_data(sub_df)
         } else {
           selected_data(data.frame())
         }
 
-        # Changed to renderUI to support HTML tags
         output$sel_summary <- shiny::renderUI({
           dat <- selected_data()
           if(nrow(dat) > 0) {
             n_total <- nrow(dat)
             n_rec   <- sum(dat$recommended, na.rm = TRUE)
             shiny::HTML(paste0(
-              "<b>Exon Pair:</b> E", e5, " – E", e3, "<br/>",
+              "<b>Exon Pair:</b> E", e5, " - E", e3, "<br/>",
               "<b>Candidate gRNA Pairs:</b> ", n_total, " (", n_rec, " recommended)"
             ))
           } else {
             shiny::HTML(paste0(
-              "<b>Exon Pair:</b> E", e5, " – E", e3, "<br/>",
+              "<b>Exon Pair:</b> E", e5, " - E", e3, "<br/>",
               "<b>Candidate gRNA Pairs:</b> 0"
             ))
           }

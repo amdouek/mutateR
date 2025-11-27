@@ -1,7 +1,7 @@
 mutateR
 ================
 Alon M Douek
-2025-11-24
+2025-11-29
 
 - [Overview](#overview)
   - [Background](#background)
@@ -14,6 +14,7 @@ Alon M Douek
   - [Interpreting the `run_mutateR()`
     output](#interpreting-the-run_mutater-output)
   - [Special cases](#special-cases)
+- [Using the `mutateR_viewer`](#using-the-mutater_viewer)
 - [Manual function execution](#manual-function-execution)
   - [`get_gene_info()`](#get_gene_info)
   - [`get_exon_structures()`](#get_exon_structures)
@@ -140,7 +141,9 @@ The `mutateR` package consists of the following ordered functions:
 | 8 | `filter_valid_gRNAs()` and `assemble_gRNA_pairs()` | Filter allowed gRNA pairs and assemble into a readable data.frame. |
 | 9 | `plot_gRNA_design()` | Visualise phase compatibility of non-contiguous exon pairs and top-ranked valid gRNA pairs. |
 | 10 | `plot_grna_heatmap()` | For large gene (\>12 exons) visualisation - helper function for `plot_grna_design()` but can be executed separately. |
-| 11 | `run_mutateR()` | Wrapper; runs entire pipeline. |
+| 11 | `plot_grna_interactive()` | Helper function for interactive plotting mode. |
+| 12 | `run_mutateR()` | Wrapper; runs entire pipeline. |
+| 13 | `mutateR_viewer()` | Launches an Shiny app for gRNA extraction from an interactive heatmap. |
 
 `mutateR` also has an additional function, `design_gRNA_pairs()`, that
 is not included in the wrapper function. This function can be used in
@@ -225,7 +228,6 @@ tp53_res <- run_mutateR(
 #> Scored 399 guides using ruleset1.
 #> Assembling valid gRNA pairs for TP53 ...
 #> Assembling gRNA pairs for exon‑flanking deletions...
-#> Flattening on-target scores from GRanges ...
 #> Retrieving InterPro domain annotations from Ensembl Genes mart...
 #> Generated 2664 candidate exon‑flanking gRNA pairs.
 #> Plotting exon phase compatibility and gRNA pairs...
@@ -304,6 +306,16 @@ ptc_flag
 terminal_exon_case
 </th>
 
+<th style="text-align:right;">
+
+genomic_deletion_size
+</th>
+
+<th style="text-align:right;">
+
+transcript_deletion_size
+</th>
+
 <th style="text-align:left;">
 
 protospacer_sequence_5p
@@ -392,24 +404,34 @@ FALSE
 FALSE
 </td>
 
-<td style="text-align:left;">
+<td style="text-align:right;">
 
-ACCATTGTTCAATATCGTCC
-</td>
-
-<td style="text-align:left;">
-
-GGG
+1148
 </td>
 
 <td style="text-align:right;">
 
-0.0442887
+576
 </td>
 
 <td style="text-align:left;">
 
-AAACACTTTTCGACATAGTG
+GGATGATTTGATGCTGTCCC
+</td>
+
+<td style="text-align:left;">
+
+CGG
+</td>
+
+<td style="text-align:right;">
+
+0.3658742
+</td>
+
+<td style="text-align:left;">
+
+TCCTCAGCATCTTATCCGAG
 </td>
 
 <td style="text-align:left;">
@@ -419,97 +441,12 @@ TGG
 
 <td style="text-align:right;">
 
-0.0507973
+0.7988059
 </td>
 
 <td style="text-align:left;">
 
 p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
-p53/RUNT-type_TF_DNA-bd_sf
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-4
-</td>
-
-<td style="text-align:right;">
-
-7
-</td>
-
-<td style="text-align:right;">
-
-5
-</td>
-
-<td style="text-align:right;">
-
-6
-</td>
-
-<td style="text-align:left;">
-
-TRUE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:left;">
-
-AGACCTGCCCTGTGCAGCTG
-</td>
-
-<td style="text-align:left;">
-
-TGG
-</td>
-
-<td style="text-align:right;">
-
-0.0471244
-</td>
-
-<td style="text-align:left;">
-
-AAACACTTTTCGACATAGTG
-</td>
-
-<td style="text-align:left;">
-
-TGG
-</td>
-
-<td style="text-align:right;">
-
-0.0507973
-</td>
-
-<td style="text-align:left;">
-
-p53_tumour_suppressor; p53-like_TF_DNA-bd_sf; p53_DNA-bd;
 p53/RUNT-type_TF_DNA-bd_sf
 </td>
 
@@ -562,24 +499,19 @@ FALSE
 FALSE
 </td>
 
-<td style="text-align:left;">
+<td style="text-align:right;">
 
-CCTTCCCAGAAAACCTACCA
-</td>
-
-<td style="text-align:left;">
-
-GGG
+1165
 </td>
 
 <td style="text-align:right;">
 
-0.5585539
+576
 </td>
 
 <td style="text-align:left;">
 
-AAACACTTTTCGACATAGTG
+CCCCGGACGATATTGAACAA
 </td>
 
 <td style="text-align:left;">
@@ -589,7 +521,22 @@ TGG
 
 <td style="text-align:right;">
 
-0.0507973
+0.6092504
+</td>
+
+<td style="text-align:left;">
+
+TCCTCAGCATCTTATCCGAG
+</td>
+
+<td style="text-align:left;">
+
+TGG
+</td>
+
+<td style="text-align:right;">
+
+0.7988059
 </td>
 
 <td style="text-align:left;">
@@ -600,7 +547,7 @@ p53/RUNT-type_TF_DNA-bd_sf
 
 <td style="text-align:left;">
 
-FALSE
+TRUE
 </td>
 
 </tr>
@@ -609,7 +556,7 @@ FALSE
 
 <td style="text-align:right;">
 
-4
+3
 </td>
 
 <td style="text-align:right;">
@@ -619,7 +566,7 @@ FALSE
 
 <td style="text-align:right;">
 
-5
+4
 </td>
 
 <td style="text-align:right;">
@@ -647,9 +594,34 @@ FALSE
 FALSE
 </td>
 
+<td style="text-align:right;">
+
+1182
+</td>
+
+<td style="text-align:right;">
+
+576
+</td>
+
 <td style="text-align:left;">
 
-CAGGGCAGGTCTTGGCCAGT
+CAATGGTTCACTGAAGACCC
+</td>
+
+<td style="text-align:left;">
+
+AGG
+</td>
+
+<td style="text-align:right;">
+
+0.1820361
+</td>
+
+<td style="text-align:left;">
+
+TCCTCAGCATCTTATCCGAG
 </td>
 
 <td style="text-align:left;">
@@ -659,27 +631,12 @@ TGG
 
 <td style="text-align:right;">
 
-0.0115891
+0.7988059
 </td>
 
 <td style="text-align:left;">
 
-AAACACTTTTCGACATAGTG
-</td>
-
-<td style="text-align:left;">
-
-TGG
-</td>
-
-<td style="text-align:right;">
-
-0.0507973
-</td>
-
-<td style="text-align:left;">
-
-p53_tumour_suppressor; p53-like_TF_DNA-bd_sf; p53_DNA-bd;
+p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
 p53/RUNT-type_TF_DNA-bd_sf
 </td>
 
@@ -732,24 +689,34 @@ FALSE
 FALSE
 </td>
 
-<td style="text-align:left;">
+<td style="text-align:right;">
 
-AAGATGACAGGGGCCAGGAG
-</td>
-
-<td style="text-align:left;">
-
-GGG
+1211
 </td>
 
 <td style="text-align:right;">
 
-0.0817923
+576
 </td>
 
 <td style="text-align:left;">
 
-AAACACTTTTCGACATAGTG
+TGAAGCTCCCAGAATGCCAG
+</td>
+
+<td style="text-align:left;">
+
+AGG
+</td>
+
+<td style="text-align:right;">
+
+0.6824355
+</td>
+
+<td style="text-align:left;">
+
+TCCTCAGCATCTTATCCGAG
 </td>
 
 <td style="text-align:left;">
@@ -759,7 +726,102 @@ TGG
 
 <td style="text-align:right;">
 
-0.0507973
+0.7988059
+</td>
+
+<td style="text-align:left;">
+
+p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
+p53/RUNT-type_TF_DNA-bd_sf
+</td>
+
+<td style="text-align:left;">
+
+TRUE
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:right;">
+
+3
+</td>
+
+<td style="text-align:right;">
+
+7
+</td>
+
+<td style="text-align:right;">
+
+4
+</td>
+
+<td style="text-align:right;">
+
+6
+</td>
+
+<td style="text-align:left;">
+
+TRUE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:right;">
+
+1226
+</td>
+
+<td style="text-align:right;">
+
+576
+</td>
+
+<td style="text-align:left;">
+
+GCCAGAGGCTGCTCCCCCCG
+</td>
+
+<td style="text-align:left;">
+
+TGG
+</td>
+
+<td style="text-align:right;">
+
+0.3874830
+</td>
+
+<td style="text-align:left;">
+
+TCCTCAGCATCTTATCCGAG
+</td>
+
+<td style="text-align:left;">
+
+TGG
+</td>
+
+<td style="text-align:right;">
+
+0.7988059
 </td>
 
 <td style="text-align:left;">
@@ -838,6 +900,16 @@ ptc_flag
 terminal_exon_case
 </th>
 
+<th style="text-align:right;">
+
+genomic_deletion_size
+</th>
+
+<th style="text-align:right;">
+
+transcript_deletion_size
+</th>
+
 <th style="text-align:left;">
 
 protospacer_sequence_5p
@@ -888,12 +960,17 @@ recommended
 
 <td style="text-align:right;">
 
-5
+3
 </td>
 
 <td style="text-align:right;">
 
-9
+7
+</td>
+
+<td style="text-align:right;">
+
+4
 </td>
 
 <td style="text-align:right;">
@@ -901,11 +978,6 @@ recommended
 6
 </td>
 
-<td style="text-align:right;">
-
-8
-</td>
-
 <td style="text-align:left;">
 
 TRUE
@@ -926,344 +998,14 @@ FALSE
 FALSE
 </td>
 
-<td style="text-align:left;">
+<td style="text-align:right;">
 
-TCCTCAGCATCTTATCCGAG
-</td>
-
-<td style="text-align:left;">
-
-TGG
+1165
 </td>
 
 <td style="text-align:right;">
 
-0.7988059
-</td>
-
-<td style="text-align:left;">
-
-ACTGGGACGGAACAGCTTTG
-</td>
-
-<td style="text-align:left;">
-
-AGG
-</td>
-
-<td style="text-align:right;">
-
-0.5867680
-</td>
-
-<td style="text-align:left;">
-
-p53-like_TF_DNA-bd_sf; p53_tumour_suppressor; p53_DNA-bd;
-p53/RUNT-type_TF_DNA-bd_sf
-</td>
-
-<td style="text-align:left;">
-
-TRUE
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-5
-</td>
-
-<td style="text-align:right;">
-
-9
-</td>
-
-<td style="text-align:right;">
-
-6
-</td>
-
-<td style="text-align:right;">
-
-8
-</td>
-
-<td style="text-align:left;">
-
-TRUE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:left;">
-
-TCCTCAGCATCTTATCCGAG
-</td>
-
-<td style="text-align:left;">
-
-TGG
-</td>
-
-<td style="text-align:right;">
-
-0.7988059
-</td>
-
-<td style="text-align:left;">
-
-AGAGAATCTCCGCAAGAAAG
-</td>
-
-<td style="text-align:left;">
-
-GGG
-</td>
-
-<td style="text-align:right;">
-
-0.5479648
-</td>
-
-<td style="text-align:left;">
-
-p53-like_TF_DNA-bd_sf; p53_tumour_suppressor; p53_DNA-bd;
-p53/RUNT-type_TF_DNA-bd_sf
-</td>
-
-<td style="text-align:left;">
-
-TRUE
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-3
-</td>
-
-<td style="text-align:right;">
-
-10
-</td>
-
-<td style="text-align:right;">
-
-4
-</td>
-
-<td style="text-align:right;">
-
-9
-</td>
-
-<td style="text-align:left;">
-
-TRUE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:left;">
-
-CCATTGTTCAATATCGTCCG
-</td>
-
-<td style="text-align:left;">
-
-GGG
-</td>
-
-<td style="text-align:right;">
-
-0.5255072
-</td>
-
-<td style="text-align:left;">
-
-AGTGGTTTCTTCTTTGGCTG
-</td>
-
-<td style="text-align:left;">
-
-GGG
-</td>
-
-<td style="text-align:right;">
-
-0.5661123
-</td>
-
-<td style="text-align:left;">
-
-p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
-p53/RUNT-type_TF_DNA-bd_sf; p53_tetrameristn; p53_tetramer_sf
-</td>
-
-<td style="text-align:left;">
-
-TRUE
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-3
-</td>
-
-<td style="text-align:right;">
-
-10
-</td>
-
-<td style="text-align:right;">
-
-4
-</td>
-
-<td style="text-align:right;">
-
-9
-</td>
-
-<td style="text-align:left;">
-
-TRUE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:left;">
-
-CCTTCCCAGAAAACCTACCA
-</td>
-
-<td style="text-align:left;">
-
-GGG
-</td>
-
-<td style="text-align:right;">
-
-0.5585539
-</td>
-
-<td style="text-align:left;">
-
-AGTGGTTTCTTCTTTGGCTG
-</td>
-
-<td style="text-align:left;">
-
-GGG
-</td>
-
-<td style="text-align:right;">
-
-0.5661123
-</td>
-
-<td style="text-align:left;">
-
-p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
-p53/RUNT-type_TF_DNA-bd_sf; p53_tetrameristn; p53_tetramer_sf
-</td>
-
-<td style="text-align:left;">
-
-TRUE
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-3
-</td>
-
-<td style="text-align:right;">
-
-10
-</td>
-
-<td style="text-align:right;">
-
-4
-</td>
-
-<td style="text-align:right;">
-
-9
-</td>
-
-<td style="text-align:left;">
-
-TRUE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
+576
 </td>
 
 <td style="text-align:left;">
@@ -1283,7 +1025,182 @@ TGG
 
 <td style="text-align:left;">
 
-AGTGGTTTCTTCTTTGGCTG
+TCCTCAGCATCTTATCCGAG
+</td>
+
+<td style="text-align:left;">
+
+TGG
+</td>
+
+<td style="text-align:right;">
+
+0.7988059
+</td>
+
+<td style="text-align:left;">
+
+p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
+p53/RUNT-type_TF_DNA-bd_sf
+</td>
+
+<td style="text-align:left;">
+
+TRUE
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:right;">
+
+3
+</td>
+
+<td style="text-align:right;">
+
+7
+</td>
+
+<td style="text-align:right;">
+
+4
+</td>
+
+<td style="text-align:right;">
+
+6
+</td>
+
+<td style="text-align:left;">
+
+TRUE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:right;">
+
+1211
+</td>
+
+<td style="text-align:right;">
+
+576
+</td>
+
+<td style="text-align:left;">
+
+TGAAGCTCCCAGAATGCCAG
+</td>
+
+<td style="text-align:left;">
+
+AGG
+</td>
+
+<td style="text-align:right;">
+
+0.6824355
+</td>
+
+<td style="text-align:left;">
+
+TCCTCAGCATCTTATCCGAG
+</td>
+
+<td style="text-align:left;">
+
+TGG
+</td>
+
+<td style="text-align:right;">
+
+0.7988059
+</td>
+
+<td style="text-align:left;">
+
+p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
+p53/RUNT-type_TF_DNA-bd_sf
+</td>
+
+<td style="text-align:left;">
+
+TRUE
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:right;">
+
+3
+</td>
+
+<td style="text-align:right;">
+
+7
+</td>
+
+<td style="text-align:right;">
+
+4
+</td>
+
+<td style="text-align:right;">
+
+6
+</td>
+
+<td style="text-align:left;">
+
+TRUE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:right;">
+
+1320
+</td>
+
+<td style="text-align:right;">
+
+576
+</td>
+
+<td style="text-align:left;">
+
+CCTTCCCAGAAAACCTACCA
 </td>
 
 <td style="text-align:left;">
@@ -1293,13 +1210,218 @@ GGG
 
 <td style="text-align:right;">
 
-0.5661123
+0.5585539
+</td>
+
+<td style="text-align:left;">
+
+TCCTCAGCATCTTATCCGAG
+</td>
+
+<td style="text-align:left;">
+
+TGG
+</td>
+
+<td style="text-align:right;">
+
+0.7988059
 </td>
 
 <td style="text-align:left;">
 
 p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
-p53/RUNT-type_TF_DNA-bd_sf; p53_tetrameristn; p53_tetramer_sf
+p53/RUNT-type_TF_DNA-bd_sf
+</td>
+
+<td style="text-align:left;">
+
+TRUE
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:right;">
+
+3
+</td>
+
+<td style="text-align:right;">
+
+7
+</td>
+
+<td style="text-align:right;">
+
+4
+</td>
+
+<td style="text-align:right;">
+
+6
+</td>
+
+<td style="text-align:left;">
+
+TRUE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:right;">
+
+1299
+</td>
+
+<td style="text-align:right;">
+
+576
+</td>
+
+<td style="text-align:left;">
+
+CCTGGTAGGTTTTCTGGGAA
+</td>
+
+<td style="text-align:left;">
+
+GGG
+</td>
+
+<td style="text-align:right;">
+
+0.5585539
+</td>
+
+<td style="text-align:left;">
+
+TCCTCAGCATCTTATCCGAG
+</td>
+
+<td style="text-align:left;">
+
+TGG
+</td>
+
+<td style="text-align:right;">
+
+0.7988059
+</td>
+
+<td style="text-align:left;">
+
+p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
+p53/RUNT-type_TF_DNA-bd_sf
+</td>
+
+<td style="text-align:left;">
+
+TRUE
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:right;">
+
+3
+</td>
+
+<td style="text-align:right;">
+
+7
+</td>
+
+<td style="text-align:right;">
+
+4
+</td>
+
+<td style="text-align:right;">
+
+6
+</td>
+
+<td style="text-align:left;">
+
+TRUE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:right;">
+
+1282
+</td>
+
+<td style="text-align:right;">
+
+576
+</td>
+
+<td style="text-align:left;">
+
+GAAGGGACAGAAGATGACAG
+</td>
+
+<td style="text-align:left;">
+
+GGG
+</td>
+
+<td style="text-align:right;">
+
+0.7889533
+</td>
+
+<td style="text-align:left;">
+
+TCCTCAGCATCTTATCCGAG
+</td>
+
+<td style="text-align:left;">
+
+TGG
+</td>
+
+<td style="text-align:right;">
+
+0.7988059
+</td>
+
+<td style="text-align:left;">
+
+p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
+p53/RUNT-type_TF_DNA-bd_sf
 </td>
 
 <td style="text-align:left;">
@@ -1358,6 +1480,8 @@ threshold).
 
 ##### Visualisation
 
+###### Static visualisation modes
+
 `mutateR` also produces a basic visualisation for exon
 phase-compatibility, by default a heatmap.
 
@@ -1375,10 +1499,6 @@ are in yellow. All incompatible exon pairs are blue.
 Domain annotations from Pfam are provided in a secondary plot element
 below the heatmap x-axis to assist you in selecting regions should you
 wish to ablate specific functional domains.
-
-> A future release will allow interactive plotting to represent
-> visualisation and easy retrieval of desired gRNA pairs directly from
-> the plot.
 
 The partially deprecated arc-based plotting mode can be accessed by
 specifying `"arc"` in the `plot_mode` parameter in `run_mutateR()`. It
@@ -1403,7 +1523,6 @@ tp53_arc <- run_mutateR(
 #> AGG CGG GGG TGG 
 #> 102  36 136 125
 #> Assembling gRNA pairs for exon‑flanking deletions...
-#> Flattening on-target scores from GRanges ...
 #> Retrieving InterPro domain annotations from Ensembl Genes mart...
 #> Generated 2664 candidate exon‑flanking gRNA pairs.
 #> Plotting exon phase compatibility and gRNA pairs...
@@ -1412,6 +1531,18 @@ tp53_arc$plot
 ```
 
 ![](README_files/figure-gfm/mutateR_plot_arc-1.png)<!-- -->
+
+###### Interactive visualisation modes
+
+`mutateR` now offers an interactive heatmap plotting mode which can be
+evoked by specifying `interactive = TRUE` inside `run_mutateR()`.
+Hovering over a cell in the heatmap will report metadata for that exon
+pair in a tooltip (e.g., whether the exon pair is (in)compatible, how
+many gRNA pairs exist for that exon pair, etc.). This visualisation mode
+is used as the basis for the much more useful `mutateR_viewer` Shiny app
+(see below).
+
+![](README_files/figure-gfm/heat_int.gif)
 
 ##### Other data levels
 
@@ -1518,7 +1649,6 @@ opn4.1 <- run_mutateR(gene_id = 'opn4.1',
 #> Assembling gRNA pairs for exon‑flanking deletions...
 #> Single-exon/two-exon gene detected: constructing intragenic deletion pairs.
 #> Generated 41041 intragenic deletion pairs; 435 meet score cutoff.
-#> Returning 435 recommended intragenic pairs.
 #> Detected intragenic assembly mode (≤2 exons).
 #> Plotting exon phase compatibility and gRNA pairs...
 #> mutateR pipeline completed for opn4.1, finding 435 gRNA pairs.
@@ -1569,7 +1699,12 @@ exon_3p
 
 <th style="text-align:right;">
 
-del_size
+genomic_deletion_size
+</th>
+
+<th style="text-align:right;">
+
+transcript_deletion_size
 </th>
 
 <th style="text-align:left;">
@@ -1618,6 +1753,11 @@ GGTGCAGTTGATGTCTCCAG
 <td style="text-align:right;">
 
 1
+</td>
+
+<td style="text-align:right;">
+
+2777
 </td>
 
 <td style="text-align:right;">
@@ -1674,6 +1814,11 @@ GGTGCAGTTGATGTCTCCAG
 2768
 </td>
 
+<td style="text-align:right;">
+
+2768
+</td>
+
 <td style="text-align:left;">
 
 ENSDART00000018501
@@ -1716,6 +1861,11 @@ GGTGCAGTTGATGTCTCCAG
 <td style="text-align:right;">
 
 1
+</td>
+
+<td style="text-align:right;">
+
+2736
 </td>
 
 <td style="text-align:right;">
@@ -1772,6 +1922,11 @@ GGTGCAGTTGATGTCTCCAG
 2661
 </td>
 
+<td style="text-align:right;">
+
+2661
+</td>
+
 <td style="text-align:left;">
 
 ENSDART00000018501
@@ -1821,6 +1976,11 @@ TTAATCAGGGGTCACCACAG
 2645
 </td>
 
+<td style="text-align:right;">
+
+2645
+</td>
+
 <td style="text-align:left;">
 
 ENSDART00000018501
@@ -1855,6 +2015,31 @@ et al., IJMS (2021)</a>). `mutateR` factors in predicted terminal exon
 PTCs when scanning for tolerated deletions, and flags these cases in the
 `run_mutateR` output in the `$pairs` dataframe, under the
 `terminal_exon_case` column.
+
+## Using the `mutateR_viewer`
+
+`mutateR_viewer` is a Shiny app you can use to further streamline the
+gRNA pair identification workflow. First, execute `run_mutateR` with
+`interactive = TRUE` to produce a plotly object in the `$plot` level.
+Pass this plot object directly to `mutateR_viewer` to access the Shiny
+app.
+
+![](images/clipboard-1401140530.gif)
+
+Currently, you can use the `mutateR_viewer` Shiny app to export all (or
+a selection of) gRNA pairs calculated for a selected exon pair either as
+plain text (by copying to the clipboard, as in the above GIF) or as a
+CSV file.
+
+The app’s data table reports the exons in the pair, the two protospacer
+sequences, their on-target scores, as well as the (approximate) genomic-
+and transcript-specific deletion sizes. Additional metadata from the
+`$pairs` data.frame not displayed in the app is included in the exported
+CSV.
+
+Future updates will implement automated genotyping primer design for
+each gRNA pair, and order sheet (e.g. IDT/Thermo)-friendly export
+styles.
 
 ## Manual function execution
 
@@ -2142,9 +2327,16 @@ tp53_cas9_gRNAs_scored
 
 - All `crisprScore` scoring methods
 
-- Visualisation improvements – in progress
+- Integration of off-target prediction analysis
+
+- Cross-species sequence/domain conservation scoring/visualisation
+
+- Constitutive exon filtering between protein-coding transcripts within
+  a gene
 
 - Workflow for handling of intronic target sequences
+
+- Automatic genotyping primer design functionalities
 
 ## Session information
 

@@ -50,7 +50,7 @@ This type of deletion can be achieved by simultaneously targeting two sites in t
 The `mutateR` package consists of the following ordered functions:
 
 | Step | Function | Functionality |
-|----|----|----|
+|------------------------|------------------------|------------------------|
 | 1 | `get_gene_info()` | Query Ensembl for gene and transcript metadata. |
 | 2 | `get_exon_structures()` | Retrieve exon coordinates and phase metadata. |
 | 3 | `find_cas9_sites()`/`find_cas12a_sites()` | Identify nuclease recognition sites. |
@@ -61,7 +61,9 @@ The `mutateR` package consists of the following ordered functions:
 | 8 | `filter_valid_gRNAs()` and `assemble_gRNA_pairs()` | Filter allowed gRNA pairs and assemble into a readable data.frame. |
 | 9 | `plot_gRNA_design()` | Visualise phase compatibility of non-contiguous exon pairs and top-ranked valid gRNA pairs. |
 | 10 | `plot_grna_heatmap()` | For large gene (\>12 exons) visualisation - helper function for `plot_grna_design()` but can be executed separately. |
-| 11 | `run_mutateR()` | Wrapper; runs entire pipeline. |
+| 11 | `plot_grna_interactive()` | Helper function for interactive plotting mode. |
+| 12 | `run_mutateR()` | Wrapper; runs entire pipeline. |
+| 13 | `mutateR_viewer()` | Launches an Shiny app for gRNA extraction from an interactive heatmap. |
 
 `mutateR` also has an additional function, `design_gRNA_pairs()`, that is not included in the wrapper function. This function can be used in isolation to produce a data.frame of gRNA pairs for the gene of interest.
 
@@ -156,6 +158,8 @@ Each 5-prime and 3-prime gRNA sequence also has corresponding `ontarget_score`, 
 
 ##### Visualisation
 
+###### Static visualisation modes
+
 `mutateR` also produces a basic visualisation for exon phase-compatibility, by default a heatmap.
 
 ```{r mutateR_plot_heatmap, fig.width=10, fig.height=8}
@@ -165,8 +169,6 @@ tp53_res$plot
 The x-axis represents the 5-prime exon, and the y-axis the three-prime exon, to represent a given exon pair. UTR-containing exons are in red, contiguous exons in green, while non-contiguous phase-compatible exons are in yellow. All incompatible exon pairs are blue.
 
 Domain annotations from Pfam are provided in a secondary plot element below the heatmap x-axis to assist you in selecting regions should you wish to ablate specific functional domains.
-
-> A future release will allow interactive plotting to represent visualisation and easy retrieval of desired gRNA pairs directly from the plot.
 
 The partially deprecated arc-based plotting mode can be accessed by specifying `"arc"` in the `plot_mode` parameter in `run_mutateR()`. It will remain, for now, the default plotting mode for small-gene edge cases (described below).
 
@@ -186,6 +188,29 @@ tp53_arc <- run_mutateR(
 
 tp53_arc$plot
 ```
+
+###### Interactive visualisation modes
+
+`mutateR` now offers an interactive heatmap plotting mode which can be evoked by specifying `interactive = TRUE` inside `run_mutateR()`. Hovering over a cell in the heatmap will report metadata for that exon pair in a tooltip (e.g., whether the exon pair is (in)compatible, how many gRNA pairs exist for that exon pair, etc.). This visualisation mode is used as the basis for the much more useful `mutateR_viewer` Shiny app (see below).
+
+```{r mutateR_interactive_heat, eval=FALSE, fig.height=8, fig.width=10, message=FALSE, warning=FALSE, include=FALSE}
+
+tp53_heat_int <- run_mutateR(
+  gene_id = "TP53",
+  species = "hsapiens",
+  genome = BSgenome.Hsapiens.UCSC.hg38,
+  nuclease = "Cas9",
+  score_method = 'ruleset1',
+  top_n = NULL,
+  quiet = TRUE,
+  plot_mode = 'heat',
+  interactive = TRUE
+)
+
+tp53_heat_int$plot
+```
+
+![](README_files/figure-gfm/heat_int.gif)
 
 ##### Other data levels
 
@@ -233,6 +258,18 @@ There is a basic plotting mode currently implemented for this type of gene, thou
 #### Terminal exon PTCs
 
 If a PTC occurs in the terminal exon of a gene, the PTC-bearing transcript is unlikely to induce NMD and subsequent compensation (an example of such an allele is the *sgsh^Δex5−6^* zebrafish mutant in [Douek et al., IJMS (2021)](https://www.mdpi.com/1422-0067/22/11/5948 "An Engineered sgsh Mutant Zebrafish Recapitulates Molecular and Behavioural Pathobiology of Sanfilippo Syndrome A/MPS IIIA"){style="font-size: 11pt;"}). `mutateR` factors in predicted terminal exon PTCs when scanning for tolerated deletions, and flags these cases in the `run_mutateR` output in the `$pairs` dataframe, under the `terminal_exon_case` column.
+
+## Using the `mutateR_viewer`
+
+`mutateR_viewer` is a Shiny app you can use to further streamline the gRNA pair identification workflow. First, execute `run_mutateR` with `interactive = TRUE` to produce a plotly object in the `$plot` level. Pass this plot object directly to `mutateR_viewer` to access the Shiny app.
+
+![](images/clipboard-1401140530.gif)
+
+Currently, you can use the `mutateR_viewer` Shiny app to export all (or a selection of) gRNA pairs calculated for a selected exon pair either as plain text (by copying to the clipboard, as in the above GIF) or as a CSV file.
+
+The app's data table reports the exons in the pair, the two protospacer sequences, their on-target scores, as well as the (approximate) genomic- and transcript-specific deletion sizes. Additional metadata from the `$pairs` data.frame not displayed in the app is included in the exported CSV.
+
+Future updates will implement automated genotyping primer design for each gRNA pair, and order sheet (e.g. IDT/Thermo)-friendly export styles.
 
 ## Manual function execution
 
@@ -293,9 +330,15 @@ tp53_cas9_gRNAs_scored
 
 -   All `crisprScore` scoring methods
 
--   Visualisation improvements – in progress
+-   Integration of off-target prediction analysis
+
+-   Cross-species sequence/domain conservation scoring/visualisation
+
+-   Constitutive exon filtering between protein-coding transcripts within a gene
 
 -   Workflow for handling of intronic target sequences
+
+-   Automatic genotyping primer design functionalities
 
 ## Session information
 

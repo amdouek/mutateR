@@ -1,11 +1,6 @@
 #' Interactive gRNA design plot
 #'
 #' Interactive plotting mode for heatmap via plotly.
-#'
-#' @export
-#' Interactive gRNA design plot
-#'
-#' Interactive plotting mode for heatmap via plotly.
 #' Handles empty pairs_df gracefully by plotting just the phase compatibility.
 #'
 #' @export
@@ -86,7 +81,7 @@ plot_grna_interactive <- function(exon_gr,
 
   merged <- merged %>%
     mutate(hover = paste0(
-      "<b>E", exon_5p, " – E", exon_3p, "</b>",
+      "<b>E", exon_5p, " - E", exon_3p, "</b>",
       "<br>Status: ", Category,
       ifelse(!is.na(n_pairs), paste0("<br>Pairs found: ", n_pairs),
              ifelse(Category == "Compatible", "<br>No valid gRNA pairs", "")),
@@ -123,7 +118,6 @@ plot_grna_interactive <- function(exon_gr,
 
   p <- layout(
     p,
-    # REMOVED subtitle to prevent overlap
     title = if (!is.null(gene_symbol)) paste0(gene_symbol, " (", transcript_id, ")") else transcript_id,
     xaxis = list(
       title = "Exon 5'",

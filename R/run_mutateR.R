@@ -77,7 +77,7 @@ run_mutateR <- function(gene_id,
                             gene_symbol = gene_symbol, species = species)
     } else {
       plot_grna_design(exons_gr, pairs, transcript_id = canonical_tx,
-                       gene_symbol = gene_symbol, mode = plot_mode)
+                       gene_symbol = gene_symbol, species = species, mode = plot_mode)
     }
   }
 
@@ -166,8 +166,9 @@ run_mutateR <- function(gene_id,
                                    plot_pairs,
                                    gene_symbol = gene_symbol,
                                    transcript_id = canonical_tx,
+                                   species = species,
                                    top_n = top_n,
-                                   mode = plotmutater_mode)
+                                   mode = plot_mode)
     }
   }, silent = TRUE)
 
