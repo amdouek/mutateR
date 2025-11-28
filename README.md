@@ -1,7 +1,11 @@
 mutateR
 ================
 Alon M Douek
+<<<<<<< HEAD
 2025-11-29
+=======
+2025-11-28
+>>>>>>> 44d8831f9b4fe84a1efc4d673c835b5bb1f5c0f5
 
 - [Overview](#overview)
   - [Background](#background)
@@ -230,8 +234,6 @@ tp53_res <- run_mutateR(
 #> Assembling gRNA pairs for exon‑flanking deletions...
 #> Retrieving InterPro domain annotations from Ensembl Genes mart...
 #> Generated 2664 candidate exon‑flanking gRNA pairs.
-#> Plotting exon phase compatibility and gRNA pairs...
-#> Retrieving Pfam domain annotations from Ensembl Genes mart...
 #> mutateR pipeline completed for TP53, finding 2664 gRNA pairs.
 ```
 
@@ -1487,9 +1489,8 @@ phase-compatibility, by default a heatmap.
 
 ``` r
 tp53_res$plot
+#> NULL
 ```
-
-![](README_files/figure-gfm/mutateR_plot_heatmap-1.png)<!-- -->
 
 The x-axis represents the 5-prime exon, and the y-axis the three-prime
 exon, to represent a given exon pair. UTR-containing exons are in red,
@@ -1525,12 +1526,22 @@ tp53_arc <- run_mutateR(
 #> Assembling gRNA pairs for exon‑flanking deletions...
 #> Retrieving InterPro domain annotations from Ensembl Genes mart...
 #> Generated 2664 candidate exon‑flanking gRNA pairs.
-#> Plotting exon phase compatibility and gRNA pairs...
 
 tp53_arc$plot
+#> NULL
 ```
 
-![](README_files/figure-gfm/mutateR_plot_arc-1.png)<!-- -->
+###### Interactive visualisation modes
+
+`mutateR` now offers an interactive heatmap plotting mode which can be
+evoked by specifying `interactive = TRUE` inside `run_mutateR()`.
+Hovering over a cell in the heatmap will report metadata for that exon
+pair in a tooltip (e.g., whether the exon pair is (in)compatible, how
+many gRNA pairs exist for that exon pair, etc.). This visualisation mode
+is used as the basis for the much more useful `mutateR_viewer` Shiny app
+(see below).
+
+![](README_files/figure-gfm/heat_int.gif)
 
 ###### Interactive visualisation modes
 
@@ -1650,7 +1661,6 @@ opn4.1 <- run_mutateR(gene_id = 'opn4.1',
 #> Single-exon/two-exon gene detected: constructing intragenic deletion pairs.
 #> Generated 41041 intragenic deletion pairs; 435 meet score cutoff.
 #> Detected intragenic assembly mode (≤2 exons).
-#> Plotting exon phase compatibility and gRNA pairs...
 #> mutateR pipeline completed for opn4.1, finding 435 gRNA pairs.
 ```
 
@@ -2383,43 +2393,43 @@ sessionInfo()
 #> [13] vctrs_0.6.5                 stringr_1.6.0              
 #> [15] pkgconfig_2.0.3             crayon_1.5.3               
 #> [17] fastmap_1.2.0               dbplyr_2.5.1               
-#> [19] labeling_0.4.3              Rsamtools_2.25.3           
-#> [21] rmarkdown_2.30              UCSC.utils_1.5.0           
-#> [23] bit_4.6.0                   xfun_0.54                  
-#> [25] randomForest_4.7-1.2        cachem_1.1.0               
-#> [27] jsonlite_2.0.0              progress_1.2.3             
-#> [29] blob_1.2.4                  DelayedArray_0.35.3        
-#> [31] BiocParallel_1.43.4         parallel_4.5.1             
-#> [33] prettyunits_1.2.0           R6_2.6.1                   
-#> [35] stringi_1.8.7               reticulate_1.44.1          
-#> [37] Rcpp_1.1.0                  SummarizedExperiment_1.39.2
-#> [39] knitr_1.50                  Matrix_1.7-4               
-#> [41] tidyselect_1.2.1            rstudioapi_0.17.1          
-#> [43] dichromat_2.0-0.1           abind_1.4-8                
-#> [45] yaml_2.3.10                 codetools_0.2-20           
-#> [47] curl_7.0.0                  lattice_0.22-7             
-#> [49] Biobase_2.69.1              withr_3.0.2                
-#> [51] KEGGREST_1.49.1             S7_0.2.1                   
-#> [53] evaluate_1.0.5              crisprScoreData_1.13.0     
-#> [55] BiocFileCache_2.99.6        xml2_1.5.0                 
-#> [57] ExperimentHub_2.99.5        pillar_1.11.1              
-#> [59] BiocManager_1.30.27         filelock_1.0.3             
-#> [61] MatrixGenerics_1.21.0       crisprScore_1.13.1         
-#> [63] RCurl_1.98-1.17             BiocVersion_3.22.0         
-#> [65] hms_1.1.4                   scales_1.4.0               
-#> [67] glue_1.8.0                  tools_4.5.1                
-#> [69] AnnotationHub_3.99.6        GenomicAlignments_1.45.4   
-#> [71] XML_3.99-0.20               grid_4.5.1                 
-#> [73] AnnotationDbi_1.71.1        basilisk_1.21.5            
-#> [75] restfulr_0.0.16             cli_3.6.5                  
-#> [77] rappdirs_0.3.3              kableExtra_1.4.0           
-#> [79] textshaping_1.0.4           viridisLite_0.4.2          
-#> [81] S4Arrays_1.9.1              svglite_2.2.2              
-#> [83] gtable_0.3.6                digest_0.6.39              
-#> [85] SparseArray_1.9.1           rjson_0.2.23               
-#> [87] farver_2.1.2                memoise_2.0.1              
-#> [89] htmltools_0.5.8.1           lifecycle_1.0.4            
-#> [91] httr_1.4.7                  bit64_4.6.0-1
+#> [19] Rsamtools_2.25.3            rmarkdown_2.30             
+#> [21] UCSC.utils_1.5.0            bit_4.6.0                  
+#> [23] xfun_0.54                   randomForest_4.7-1.2       
+#> [25] cachem_1.1.0                jsonlite_2.0.0             
+#> [27] progress_1.2.3              blob_1.2.4                 
+#> [29] DelayedArray_0.35.3         BiocParallel_1.43.4        
+#> [31] parallel_4.5.1              prettyunits_1.2.0          
+#> [33] R6_2.6.1                    stringi_1.8.7              
+#> [35] reticulate_1.44.1           Rcpp_1.1.0                 
+#> [37] SummarizedExperiment_1.39.2 knitr_1.50                 
+#> [39] Matrix_1.7-4                tidyselect_1.2.1           
+#> [41] rstudioapi_0.17.1           dichromat_2.0-0.1          
+#> [43] abind_1.4-8                 yaml_2.3.10                
+#> [45] codetools_0.2-20            curl_7.0.0                 
+#> [47] lattice_0.22-7              Biobase_2.69.1             
+#> [49] withr_3.0.2                 KEGGREST_1.49.1            
+#> [51] S7_0.2.1                    evaluate_1.0.5             
+#> [53] crisprScoreData_1.13.0      BiocFileCache_2.99.6       
+#> [55] xml2_1.5.0                  ExperimentHub_2.99.5       
+#> [57] pillar_1.11.1               BiocManager_1.30.27        
+#> [59] filelock_1.0.3              MatrixGenerics_1.21.0      
+#> [61] crisprScore_1.13.1          RCurl_1.98-1.17            
+#> [63] BiocVersion_3.22.0          hms_1.1.4                  
+#> [65] scales_1.4.0                glue_1.8.0                 
+#> [67] tools_4.5.1                 AnnotationHub_3.99.6       
+#> [69] GenomicAlignments_1.45.4    XML_3.99-0.20              
+#> [71] grid_4.5.1                  AnnotationDbi_1.71.1       
+#> [73] basilisk_1.21.5             restfulr_0.0.16            
+#> [75] cli_3.6.5                   rappdirs_0.3.3             
+#> [77] kableExtra_1.4.0            textshaping_1.0.4          
+#> [79] viridisLite_0.4.2           S4Arrays_1.9.1             
+#> [81] svglite_2.2.2               gtable_0.3.6               
+#> [83] digest_0.6.39               SparseArray_1.9.1          
+#> [85] rjson_0.2.23                farver_2.1.2               
+#> [87] memoise_2.0.1               htmltools_0.5.8.1          
+#> [89] lifecycle_1.0.4             httr_1.4.7                 
+#> [91] bit64_4.6.0-1
 ```
 
 ## References
