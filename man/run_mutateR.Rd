@@ -14,7 +14,8 @@ run_mutateR(
   top_n = 10,
   quiet = FALSE,
   plot_mode = c("heat", "arc"),
-  interactive = FALSE
+  interactive = FALSE,
+  score_threshold = NULL
 )
 }
 \arguments{
@@ -38,6 +39,8 @@ Cas9: "ruleset1", "azimuth", "deephf";  Cas12a: "deepcpf1".}
 \item{plot_mode}{Character. One of "heat" (default) or "arc". Passed to \code{plot_grna_design()}}
 
 \item{interactive}{Logical; default FALSE. Use interactive plotly-based viewer instead of static ggplot-based visualisation.}
+
+\item{score_threshold}{Numeric. Optional override for score cutoff. If NULL, defaults to 0.5 (Cas9 probability-based scoring) or 50 (Cas12a linear regression score).}
 }
 \value{
 A named list with elements:

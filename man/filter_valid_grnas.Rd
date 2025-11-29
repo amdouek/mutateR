@@ -8,7 +8,7 @@ filter_valid_grnas(
   exon_gr,
   genome,
   species,
-  score_method = c("ruleset1", "azimuth", "deephf")
+  score_method = c("ruleset1", "azimuth", "deephf", "deepcpf1")
 )
 }
 \arguments{

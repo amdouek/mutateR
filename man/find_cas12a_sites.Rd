@@ -22,4 +22,5 @@ sequence_context (34 bp), cut_site.
 }
 \description{
 Scans exon sequences (both strands) for Cas12a gRNA sites (default PAM "TTTV")
+Retrieves full genomic context (34 bp) even if sites are near exon boundaries.
 }

@@ -19,6 +19,7 @@ score_grnas(
 GRanges with added metadata column \code{ontarget_score} (numeric)
 }
 \description{
-Handles RuleSet1 (Doench et al., Nat Biotech (2014)) and Azimuth (Doench et al. Nat Biotech (2016) -- in progress) with proper PAM alignment.
-For models unsupported on Windows, returns NA scores and a warning.
+Handles RuleSet1 (Doench et al., Nat Biotech (2014)) and Azimuth (Doench et al. Nat Biotech (2016) -- in progress) for Cas9 and DeepCpf1 for Cas12.
+Automatically routes DeepCpf1 requests to the internal Python backend
+on Windows to bypass crisprScore OS limitations.
 }

@@ -13,6 +13,7 @@
 #' @param quiet Logical. Suppress intermediate messages (default FALSE).
 #' @param plot_mode Character. One of "heat" (default) or "arc". Passed to \code{plot_grna_design()}
 #' @param interactive Logical; default FALSE. Use interactive plotly-based viewer instead of static ggplot-based visualisation.
+#' @param score_threshold Numeric. Optional override for score cutoff. If NULL, defaults to 0.5 (Cas9 probability-based scoring) or 50 (Cas12a linear regression score).
 #'
 #' @return A named list with elements:
 #'   - transcript_id
@@ -31,7 +32,8 @@ run_mutateR <- function(gene_id,
                         top_n = 10,
                         quiet = FALSE,
                         plot_mode = c("heat", "arc"),
-                        interactive = FALSE) {
+                        interactive = FALSE,
+                        score_threshold = NULL) {
 
   suppressPackageStartupMessages({
     library(dplyr)
@@ -42,13 +44,26 @@ run_mutateR <- function(gene_id,
   nuclease <- match.arg(nuclease)
 
   if (!inherits(genome, "BSgenome"))
-    stop("Please supply a valid BSgenome object. You can see which genomes are available using BSgenome::available.genomes()")
+    stop("Please supply a valid BSgenome object.")
 
   if (is.null(score_method)) {
     score_method <- if (nuclease == "Cas9") "ruleset1" else "deepcpf1"
   }
 
-  ## ----- Step 1: Retrieve canonical transcript -----
+  # --- NEW: Dynamic cutoff logic ---
+  if (is.null(score_threshold)) {
+    if (nuclease == "Cas12a" || score_method == "deepcpf1") {
+      # DeepCpf1 Scale: 0 to 100
+      cutoff_val <- 50
+    } else {
+      # RuleSet1/Azimuth Scale: 0 to 1
+      cutoff_val <- 0.5
+    }
+  } else {
+    cutoff_val <- score_threshold
+  }
+
+  ## ----- Step 1: Gene Info -----
   if (!quiet) message("Retrieving gene/transcript information...")
   tx_info <- get_gene_info(gene_id, species)
 
@@ -70,14 +85,14 @@ run_mutateR <- function(gene_id,
   ## ----- Step 2: Exon structures -----
   exons_gr <- get_exon_structures(canonical_tx, species, output = "GRanges")
 
-  # Helper for early returns
   generate_early_plot <- function(pairs = NULL) {
     if (interactive) {
       plot_grna_interactive(exons_gr, pairs, transcript_id = canonical_tx,
                             gene_symbol = gene_symbol, species = species)
     } else {
       plot_grna_design(exons_gr, pairs, transcript_id = canonical_tx,
-                       gene_symbol = gene_symbol, species = species, mode = plot_mode)
+                       gene_symbol = gene_symbol, species = species,
+                       mode = plot_mode)
     }
   }
 
@@ -99,25 +114,21 @@ run_mutateR <- function(gene_id,
                 plot = generate_early_plot(NULL)))
   }
 
-  ## ----- Step 4: Calculate on-target gRNA scores -----
+  ## ----- Step 4: Scoring (Updated) -----
   if (!quiet) message("Scoring gRNAs using model: ", score_method)
-  os_is_windows <- identical(.Platform$OS.type, "windows")
 
-  if (os_is_windows && tolower(score_method) == "deepcpf1") {
-    warning("DeepCpf1 model unsupported on Windows; skipping scoring.")
-    scored_grnas <- hits
-    mcols(scored_grnas)$gc <- NA_real_
-    mcols(scored_grnas)$ontarget_score <- NA_real_
+  # We removed the Windows/DeepCpf1 guard block here.
+  # score_grnas handles the fallback internally now.
+
+  if (quiet) {
+    suppressMessages({scored_grnas <- score_grnas(hits, method = score_method)})
   } else {
-    if (quiet) {
-      suppressMessages({scored_grnas <- score_grnas(hits, method = score_method)})
-    } else {
-      scored_grnas <- score_grnas(hits, method = score_method)
-    }
+    scored_grnas <- score_grnas(hits, method = score_method)
   }
 
-  ## ----- Step 5: Filter and assemble gRNA pairs -----
+  ## ----- Step 5: Assembly -----
   if (!quiet) message("Assembling valid gRNA pairs for ", gene_id, " ...")
+
   valid_grnas <- suppressMessages({
     suppressWarnings({
       tmp <- capture.output(
@@ -131,14 +142,15 @@ run_mutateR <- function(gene_id,
     assemble_grna_pairs(valid_grnas,
                         exon_gr = exons_gr,
                         transcript_id = canonical_tx,
-                        species = species),
+                        species = species,
+                        score_cutoff = cutoff_val), # Pass dynamic cutoff here
     error = function(e) {
       warning("Pair assembly failed: ", e$message)
       NULL
     }
   )
 
-  ## ----- Step 6: Detect intragenic mode -----
+  ## ----- Step 6: Intragenic Detection -----
   intragenic_mode <- FALSE
   if (is.list(pairs_df) && "pairs" %in% names(pairs_df)) {
     pairs_df <- pairs_df$pairs
@@ -146,7 +158,7 @@ run_mutateR <- function(gene_id,
     message("Detected intragenic assembly mode (≤2 exons).")
   }
 
-  ## ----- Step 7: Plot generation -----
+  ## ----- Step 7: Plotting -----
   plot_obj <- NULL
   try({
     plot_pairs <- if (is.null(pairs_df)) data.frame() else pairs_df
@@ -170,9 +182,9 @@ run_mutateR <- function(gene_id,
                                    top_n = top_n,
                                    mode = plot_mode)
     }
-  }, silent = TRUE)
+  })
 
-  ## ----- Step 8: Wrap and return -----
+  ## ----- Step 8: Return -----
   if (!quiet) message("mutateR pipeline completed for ", gene_id,
                       ", finding ",
                       ifelse(is.null(pairs_df), 0, nrow(pairs_df)),
