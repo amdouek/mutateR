@@ -14,4 +14,5 @@ Logical TRUE if successful, FALSE otherwise.
 }
 \description{
 Points the current R session to the mutateR Conda environment.
+Automatically handles RETICULATE_PYTHON conflicts.
 }

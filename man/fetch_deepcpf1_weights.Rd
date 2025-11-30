@@ -2,7 +2,7 @@
 % Please edit documentation in R/deep_learning_utils.R
 \name{fetch_deepcpf1_weights}
 \alias{fetch_deepcpf1_weights}
-\title{Fetch DeepCpf1 Model Weights}
+\title{Fetch DeepCpf1 model weights}
 \usage{
 fetch_deepcpf1_weights()
 }
@@ -11,4 +11,5 @@ Path to the weights file (.h5).
 }
 \description{
 Retrieves the path to the embedded DeepCpf1 weights file.
+Note: The weights used is for the Seq-DeepCpf1 model (solely sequence-dependent)
 }

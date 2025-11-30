@@ -18,6 +18,6 @@ install_mutater_env(
 \item{fresh}{Logical. If TRUE, removes existing environment before installing.}
 }
 \description{
-Sets up a specific Conda environment for mutateR containing
-TensorFlow and necessary dependencies.
+Sets up a specific Conda environment for mutateR
+containing TensorFlow and necessary dependencies.
 }

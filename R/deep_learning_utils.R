@@ -1,6 +1,7 @@
-#' Fetch DeepCpf1 Model Weights
+#' Fetch DeepCpf1 model weights
 #'
 #' Retrieves the path to the embedded DeepCpf1 weights file.
+#' Note: The weights used is for the Seq-DeepCpf1 model (solely sequence-dependent)
 #'
 #' @return Path to the weights file (.h5).
 #' @export
@@ -22,7 +23,7 @@ fetch_deepcpf1_weights <- function() {
 #'
 #' Converts a set of DNA sequences into a 3D numeric array
 #' (Samples x Length x 4) suitable for Keras/TensorFlow.
-#' Optimized for performance.
+#' Optimised for performance.
 #'
 #' @param sequences Character vector of DNA sequences.
 #'
@@ -49,11 +50,11 @@ one_hot_encode_dna <- function(sequences) {
 
   char_mat <- matrix(char_vec, nrow = n_seqs, ncol = seq_len, byrow = TRUE)
 
-  # Initialize 3D array: (N, Length, 4)
+  # Initialise 3D array: (N, Length, 4)
   # Channels: A, C, G, T
   x_encoded <- array(0, dim = c(n_seqs, seq_len, 4))
 
-  # Vectorized assignment
+  # Vectorised assignment
   x_encoded[,,1] <- (char_mat == "A") * 1
   x_encoded[,,2] <- (char_mat == "C") * 1
   x_encoded[,,3] <- (char_mat == "G") * 1

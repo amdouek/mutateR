@@ -11,11 +11,14 @@ run_mutateR(
   nuclease = c("Cas9", "Cas12a"),
   transcript_id = NULL,
   score_method = NULL,
+  min_score = NULL,
+  design_primers = TRUE,
+  primer_max_wt = 3000,
+  primer_tm = 60,
   top_n = 10,
   quiet = FALSE,
   plot_mode = c("heat", "arc"),
-  interactive = FALSE,
-  score_threshold = NULL
+  interactive = FALSE
 )
 }
 \arguments{
@@ -32,26 +35,41 @@ run_mutateR(
 \item{score_method}{Character. On‑target scoring model:
 Cas9: "ruleset1", "azimuth", "deephf";  Cas12a: "deepcpf1".}
 
+\item{min_score}{Numeric. Optional override for on-target score cutoff.
+If NULL (default), auto-selects (0.5 for Cas9 models, 50 for DeepCpf1).}
+
+\item{design_primers}{Logical. Whether to design genotyping primers (default TRUE).}
+
+\item{primer_max_wt}{Integer. Max WT amplicon size before switching to dual-pair strategy (default 3000).}
+
+\item{primer_tm}{Numeric. Target melting temperature for primers (default 60.0).}
+
 \item{top_n}{Integer. Number of top recommended pairs to plot (default 10; NULL = all).}
 
 \item{quiet}{Logical. Suppress intermediate messages (default FALSE).}
 
 \item{plot_mode}{Character. One of "heat" (default) or "arc". Passed to \code{plot_grna_design()}}
 
-\item{interactive}{Logical; default FALSE. Use interactive plotly-based viewer instead of static ggplot-based visualisation.}
-
-\item{score_threshold}{Numeric. Optional override for score cutoff. If NULL, defaults to 0.5 (Cas9 probability-based scoring) or 50 (Cas12a linear regression score).}
+\item{interactive}{Logical; default FALSE. Use interactive plotly-based viewer.}
 }
 \value{
 A named list with elements:
 \itemize{
 \item transcript_id
-\item exons
-\item scored_grnas
-\item pairs
-\item plot
+\item exons (GRanges)
+\item scored_grnas (GRanges)
+\item pairs (data.frame with gRNAs and primers)
+\item plot (ggplot or plotly object)
 }
 }
 \description{
-Executes all major steps of the mutateR pipeline end‑to‑end
+Executes all major steps of the mutateR pipeline end‑to‑end:
+\enumerate{
+\item Gene/Transcript retrieval
+\item Exon phase mapping
+\item gRNA finding & scoring (Cas9 or Cas12a)
+\item Exon-deletion pair assembly (Auto-detects scoring thresholds unless overridden)
+\item Genotyping primer design (Optimised: runs only on recommended pairs)
+\item Visualisation
+}
 }

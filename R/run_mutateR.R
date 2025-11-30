@@ -1,6 +1,12 @@
 #' Run the complete mutateR workflow
 #'
-#' Executes all major steps of the mutateR pipeline end‑to‑end
+#' Executes all major steps of the mutateR pipeline end‑to‑end:
+#' 1. Gene/Transcript retrieval
+#' 2. Exon phase mapping
+#' 3. gRNA finding & scoring (Cas9 or Cas12a)
+#' 4. Exon-deletion pair assembly (Auto-detects scoring thresholds unless overridden)
+#' 5. Genotyping primer design (Optimised: runs only on recommended pairs)
+#' 6. Visualisation
 #'
 #' @param gene_id Character. Gene symbol or Ensembl Gene ID (ENSG...).
 #' @param species Character. e.g. "hsapiens", "mmusculus", "drerio".
@@ -9,18 +15,22 @@
 #' @param transcript_id Optional Ensembl transcript ID to override canonical.
 #' @param score_method Character. On‑target scoring model:
 #'        Cas9: "ruleset1", "azimuth", "deephf";  Cas12a: "deepcpf1".
+#' @param min_score Numeric. Optional override for on-target score cutoff.
+#'        If NULL (default), auto-selects (0.5 for Cas9 models, 50 for DeepCpf1).
+#' @param design_primers Logical. Whether to design genotyping primers (default TRUE).
+#' @param primer_max_wt Integer. Max WT amplicon size before switching to dual-pair strategy (default 3000).
+#' @param primer_tm Numeric. Target melting temperature for primers (default 60.0).
 #' @param top_n Integer. Number of top recommended pairs to plot (default 10; NULL = all).
 #' @param quiet Logical. Suppress intermediate messages (default FALSE).
 #' @param plot_mode Character. One of "heat" (default) or "arc". Passed to \code{plot_grna_design()}
-#' @param interactive Logical; default FALSE. Use interactive plotly-based viewer instead of static ggplot-based visualisation.
-#' @param score_threshold Numeric. Optional override for score cutoff. If NULL, defaults to 0.5 (Cas9 probability-based scoring) or 50 (Cas12a linear regression score).
+#' @param interactive Logical; default FALSE. Use interactive plotly-based viewer.
 #'
 #' @return A named list with elements:
 #'   - transcript_id
-#'   - exons
-#'   - scored_grnas
-#'   - pairs
-#'   - plot
+#'   - exons (GRanges)
+#'   - scored_grnas (GRanges)
+#'   - pairs (data.frame with gRNAs and primers)
+#'   - plot (ggplot or plotly object)
 #'
 #' @export
 run_mutateR <- function(gene_id,
@@ -29,11 +39,14 @@ run_mutateR <- function(gene_id,
                         nuclease = c("Cas9", "Cas12a"),
                         transcript_id = NULL,
                         score_method = NULL,
+                        min_score = NULL,
+                        design_primers = TRUE,
+                        primer_max_wt = 3000,
+                        primer_tm = 60.0,
                         top_n = 10,
                         quiet = FALSE,
                         plot_mode = c("heat", "arc"),
-                        interactive = FALSE,
-                        score_threshold = NULL) {
+                        interactive = FALSE) {
 
   suppressPackageStartupMessages({
     library(dplyr)
@@ -48,19 +61,6 @@ run_mutateR <- function(gene_id,
 
   if (is.null(score_method)) {
     score_method <- if (nuclease == "Cas9") "ruleset1" else "deepcpf1"
-  }
-
-  # --- NEW: Dynamic cutoff logic ---
-  if (is.null(score_threshold)) {
-    if (nuclease == "Cas12a" || score_method == "deepcpf1") {
-      # DeepCpf1 Scale: 0 to 100
-      cutoff_val <- 50
-    } else {
-      # RuleSet1/Azimuth Scale: 0 to 1
-      cutoff_val <- 0.5
-    }
-  } else {
-    cutoff_val <- score_threshold
   }
 
   ## ----- Step 1: Gene Info -----
@@ -114,11 +114,8 @@ run_mutateR <- function(gene_id,
                 plot = generate_early_plot(NULL)))
   }
 
-  ## ----- Step 4: Scoring (Updated) -----
+  ## ----- Step 4: Scoring -----
   if (!quiet) message("Scoring gRNAs using model: ", score_method)
-
-  # We removed the Windows/DeepCpf1 guard block here.
-  # score_grnas handles the fallback internally now.
 
   if (quiet) {
     suppressMessages({scored_grnas <- score_grnas(hits, method = score_method)})
@@ -143,22 +140,60 @@ run_mutateR <- function(gene_id,
                         exon_gr = exons_gr,
                         transcript_id = canonical_tx,
                         species = species,
-                        score_cutoff = cutoff_val), # Pass dynamic cutoff here
+                        score_cutoff = min_score), # Passes user override or NULL
     error = function(e) {
       warning("Pair assembly failed: ", e$message)
       NULL
     }
   )
 
-  ## ----- Step 6: Intragenic Detection -----
+  ## ----- Step 6: Intragenic Detection & Unpacking -----
   intragenic_mode <- FALSE
   if (is.list(pairs_df) && "pairs" %in% names(pairs_df)) {
     pairs_df <- pairs_df$pairs
     intragenic_mode <- TRUE
-    message("Detected intragenic assembly mode (≤2 exons).")
+    if (!quiet) message("Detected intragenic assembly mode (≤2 exons).")
   }
 
-  ## ----- Step 7: Plotting -----
+  ## ----- Step 7: Primer Design (Optimized) -----
+  if (design_primers && !is.null(pairs_df) && nrow(pairs_df) > 0) {
+
+    # Check if we have any recommended pairs
+    n_rec <- sum(pairs_df$recommended, na.rm = TRUE)
+
+    if (n_rec > 0) {
+      if (!quiet) message("Designing genotyping primers for ", n_rec, " recommended pairs...")
+
+      # Split dataframe
+      df_rec  <- pairs_df[pairs_df$recommended == TRUE, ]
+      df_rest <- pairs_df[pairs_df$recommended == FALSE, ]
+
+      # Run design ONLY on recommended
+      df_rec <- tryCatch({
+        get_genotyping_primers(
+          df_rec,
+          exons_gr,
+          genome,
+          max_wt_amplicon = primer_max_wt,
+          target_tm = primer_tm
+        )
+      }, error = function(e) {
+        warning("Primer design failed: ", e$message)
+        df_rec # return un-modified if fail
+      })
+
+      # Recombine safely using dplyr::bind_rows (handles empty df_rest automatically)
+      pairs_df <- dplyr::bind_rows(df_rec, df_rest)
+
+      # Sort recommended to top
+      pairs_df <- pairs_df[order(pairs_df$recommended, decreasing = TRUE), ]
+
+    } else {
+      if (!quiet) message("No recommended pairs found; skipping primer design.")
+    }
+  }
+
+  ## ----- Step 8: Plotting -----
   plot_obj <- NULL
   try({
     plot_pairs <- if (is.null(pairs_df)) data.frame() else pairs_df
@@ -184,7 +219,7 @@ run_mutateR <- function(gene_id,
     }
   })
 
-  ## ----- Step 8: Return -----
+  ## ----- Step 9: Return -----
   if (!quiet) message("mutateR pipeline completed for ", gene_id,
                       ", finding ",
                       ifelse(is.null(pairs_df), 0, nrow(pairs_df)),

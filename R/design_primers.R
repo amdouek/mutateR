@@ -1,229 +1,217 @@
-#' Design Genotyping Primers for Exon Deletions
+#' Design genotyping primers for mutateR-designed deletions
 #'
-#' Scans genomic regions flanking the predicted deletion site to design
-#' Forward and Reverse PCR primers. Uses a penalty-based selection system
-#' optimizing for Tm (~60°C), GC content (50%), and 3' GC clamps.
+#' Automatically designs PCR primers to genotype CRISPR-mediated deletions.
+#' Implements a dynamic strategy based on deletion size with caching for performance.
 #'
 #' @param pairs_df Data frame returned by \code{assemble_grna_pairs}.
+#' @param exons_gr GRanges object of exon structures.
 #' @param genome BSgenome object.
-#' @param flank_min Integer. Minimum distance from cut site to primer (default 100bp).
-#'                  Ensures primers are not chewed back during repair.
-#' @param flank_max Integer. Maximum distance from cut site to primer (default 400bp).
-#' @param target_tm Numeric. Optimal melting temperature (default 60).
+#' @param max_wt_amplicon Integer. Deletions larger than this trigger Strategy B (default 3000).
+#' @param target_tm Numeric. Optimal melting temperature (default 60.0).
 #'
-#' @return The input data frame with 4 new columns:
-#'   \item{primer_fwd}{Sequence of the forward primer (5'-3')}
-#'   \item{primer_rev}{Sequence of the reverse primer (5'-3')}
-#'   \item{wt_amplicon_size}{Size of the band in wild-type cells}
-#'   \item{mut_amplicon_size}{Predicted size of the band in deletion clones}
-#'
-#' @importFrom Biostrings getSeq reverseComplement DNAString matchPattern
+#' @return The input data frame with added primer columns.
 #' @export
 get_genotyping_primers <- function(pairs_df,
+                                   exons_gr,
                                    genome,
-                                   flank_min = 100,
-                                   flank_max = 400,
+                                   max_wt_amplicon = 3000,
                                    target_tm = 60.0) {
 
   if (is.null(pairs_df) || nrow(pairs_df) == 0) return(pairs_df)
-  if (!inherits(genome, "BSgenome")) stop("genome must be a BSgenome object.")
 
-  message("Designing genotyping primers for ", nrow(pairs_df), " candidate pairs...")
-
-  # --- Pre-allocate result vectors ---
-  fwd_seqs <- character(nrow(pairs_df))
-  rev_seqs <- character(nrow(pairs_df))
-  wt_sizes <- integer(nrow(pairs_df))
-  mut_sizes <- integer(nrow(pairs_df))
-
-  # --- Helper: Simple Tm Calculation (GC-adjusted) ---
-  # Formula: Tm = 64.9 + 41 * (GC - 16.4) / L
-  calculate_tm <- function(seq_str) {
-    len <- nchar(seq_str)
-    if (len == 0) return(0)
-    g_c <- sum(charToRaw(seq_str) %in% charToRaw("GC"))
-    tm <- 64.9 + 41 * ((g_c - 16.4) / len)
-    return(tm)
+  # --- Input Validation ---
+  if (!all(c("cut_site_5p", "cut_site_3p") %in% names(pairs_df))) {
+    if ("end_5p" %in% names(pairs_df)) pairs_df$cut_site_5p <- pairs_df$end_5p
+    if ("start_3p" %in% names(pairs_df)) pairs_df$cut_site_3p <- pairs_df$start_3p
   }
 
-  # --- Helper: Scan a region for the best primer ---
-  # direction 1 = Forward (Genomic + strand)
-  # direction -1 = Reverse (Genomic - strand, output as RevComp)
-  find_best_primer <- function(chrom, start, end, direction = 1) {
+  has_coords <- !is.na(pairs_df$cut_site_5p) &
+    !is.na(pairs_df$cut_site_3p) &
+    !is.na(pairs_df$seqnames_5p)
 
-    # 1. Get Sequence
-    # We always fetch the + strand genomic sequence first
-    region_seq <- tryCatch({
-      as.character(Biostrings::getSeq(genome, names=chrom, start=max(1, start), end=end))
-    }, error = function(e) return(NULL))
+  if (sum(!has_coords) > 0) warning("Skipping ", sum(!has_coords), " pairs due to missing coordinate data.")
 
-    if (is.null(region_seq) || nchar(region_seq) < 20) return(NULL)
+  n_total <- nrow(pairs_df)
 
-    # 2. Generate Candidates (Sliding Window)
-    # Lengths 18 to 24 bp
-    candidates <- list()
+  # --- Setup Output Vectors ---
+  strategies <- rep(NA_character_, n_total)
+  ext_fwd    <- rep(NA_character_, n_total); ext_rev <- rep(NA_character_, n_total)
+  int_fwd    <- rep(NA_character_, n_total); int_rev <- rep(NA_character_, n_total)
+  size_wt    <- rep(NA_character_, n_total); size_mut <- rep(NA_integer_, n_total)
+  size_int   <- rep(NA_integer_, n_total)
 
-    for (len in 18:24) {
-      if (nchar(region_seq) < len) next
-      num_windows <- nchar(region_seq) - len + 1
-      starts <- 1:num_windows
+  # --- Cache for Internal Primers ---
+  internal_primer_cache <- list()
 
-      substrings <- substring(region_seq, starts, starts + len - 1)
+  # --- Helper: Fast Tm Calc ---
+  calc_tm_vec <- function(seqs) {
+    w <- nchar(seqs)
+    gc_counts <- nchar(gsub("[AT]", "", seqs))
+    64.9 + 41 * ((gc_counts - 16.4) / w)
+  }
 
-      # 3. Filter & Score
-      for (k in seq_along(substrings)) {
-        s <- substrings[k]
+  # --- Helper: Optimised Region Scanner ---
+  scan_region <- function(chrom, start, end, direction = 1) {
+    if (is.na(start) || is.na(end) || end <= start) return(NULL)
 
-        # GC Check (40-60%)
-        gc_count <- sum(charToRaw(s) %in% charToRaw("GC"))
-        gc_perc <- (gc_count / len) * 100
-        if (gc_perc < 40 || gc_perc > 65) next
+    seq_dna <- tryCatch({
+      Biostrings::getSeq(genome, names=chrom, start=max(1, start), end=end)
+    }, error = function(e) NULL)
 
-        # GC Clamp (Ends in G or C)
-        last_base <- substring(s, len, len)
-        if (!last_base %in% c("G", "C")) next
+    if (is.null(seq_dna) || length(seq_dna) == 0) return(NULL)
 
-        # Poly-X Check (Max 4 repeats)
-        if (grepl("AAAAA|CCCCC|GGGGG|TTTTT", s)) next
+    seq_str <- as.character(seq_dna)
+    len_region <- nchar(seq_str)
+    p_len <- 20
 
-        # Tm Check
-        tm <- calculate_tm(s)
-        if (tm < 55 || tm > 65) next
+    if (len_region < p_len) return(NULL)
 
-        # Calculate Penalty
-        # 1. Deviation from target Tm
-        # 2. Deviation from 50% GC
-        # 3. Distance from 'start' (we prefer primers closer to cut site to keep amplicon small)
-        #    If Forward: 'k' increases = further from cut? No, region is [Cut-Max, Cut-Min].
-        #    So higher 'k' = closer to cut. We want higher k.
-        #    If Reverse: region is [Cut+Min, Cut+Max]. Lower 'k' = closer to cut.
+    starts <- 1:(len_region - p_len + 1)
+    cands  <- substring(seq_str, starts, starts + p_len - 1)
 
-        pen_tm <- abs(tm - target_tm) * 2
-        pen_gc <- abs(gc_perc - 50) * 0.5
+    # Filter GC (40-65%)
+    gc_nums <- nchar(gsub("[AT]", "", cands))
+    gc_frac <- gc_nums / p_len
+    keep_gc <- gc_frac >= 0.40 & gc_frac <= 0.65
+    if (!any(keep_gc)) return(NULL)
+    cands_sub <- cands[keep_gc]; starts_sub <- starts[keep_gc]
 
-        candidates[[length(candidates) + 1]] <- list(
-          seq = s,
-          pos_relative = k,
-          len = len,
-          penalty = pen_tm + pen_gc
-        )
-      }
-    }
+    # Filter 3' Clamp
+    last_char <- substring(cands_sub, p_len, p_len)
+    keep_clamp <- last_char %in% c("G", "C")
+    if (!any(keep_clamp)) return(NULL)
+    cands_sub <- cands_sub[keep_clamp]; starts_sub <- starts_sub[keep_clamp]
 
-    if (length(candidates) == 0) return(NULL)
+    # Filter Tm
+    tms <- calc_tm_vec(cands_sub)
+    tm_diff <- abs(tms - target_tm)
+    keep_tm <- tm_diff <= 5
+    if (!any(keep_tm)) return(NULL)
 
-    # Convert to DF
-    cand_df <- do.call(rbind, lapply(candidates, as.data.frame))
+    cands_final <- cands_sub[keep_tm]
+    starts_final <- starts_sub[keep_tm]
+    scores_final <- tm_diff[keep_tm]
 
-    # 4. Pick Best
-    # We want primers closer to the cut sites (smaller amplicons usually better for genotyping)
-    # Forward Region: [Far ... Near] -> We want high relative position (end of string)
-    # Reverse Region: [Near ... Far] -> We want low relative position (start of string)
+    # Pick Best
+    pos_norm <- starts_final / len_region
+    pen_pos  <- if (direction == 1) (1 - pos_norm) * 2 else pos_norm * 2
+    best_idx <- which.min(scores_final + pen_pos)
 
-    if (direction == 1) {
-      # Forward: Prioritize higher 'pos_relative' (closer to 3' end of the search window)
-      cand_df$final_score <- cand_df$penalty - (cand_df$pos_relative * 0.05)
-    } else {
-      # Reverse: Prioritize lower 'pos_relative' (closer to 5' end of the search window)
-      cand_df$final_score <- cand_df$penalty + (cand_df$pos_relative * 0.05)
-    }
-
-    best <- cand_df[which.min(cand_df$final_score), ]
-
-    # 5. Return info
-    # Return genomic coordinate of the 5' end of the primer
-    genomic_start <- start + best$pos_relative - 1
-
-    res <- list(seq = as.character(best$seq),
-                gen_start = genomic_start,
-                gen_end = genomic_start + best$len - 1)
+    final_seq <- cands_final[best_idx]
+    final_gen_start <- start + starts_final[best_idx] - 1
 
     if (direction == -1) {
-      # Reverse Complement for Reverse Primer
-      res$seq <- as.character(Biostrings::reverseComplement(Biostrings::DNAString(res$seq)))
+      final_seq <- as.character(Biostrings::reverseComplement(Biostrings::DNAString(final_seq)))
     }
-
-    return(res)
+    return(list(seq = final_seq, start = final_gen_start, end = final_gen_start + p_len - 1))
   }
 
-  # --- Main Loop ---
-  for (i in seq_len(nrow(pairs_df))) {
+  exons_df <- as.data.frame(exons_gr)
 
-    # Determine Cut Sites
-    # Use explicit columns if available, or derive from start/end
-    # Note: assemble_grna_pairs usually outputs 'cut_site_5p' / 'cut_site_3p' in newer versions,
-    # but might fallback to 'end_5p' / 'start_3p' if simplified.
+  message("Designing primers (optimised)...")
+  pb <- utils::txtProgressBar(min = 0, max = n_total, style = 3)
 
-    # Logic: Cas9 cut is usually -3 from PAM.
-    # Let's rely on genomic coords.
-    # 5p site: We cut roughly at the end of the 5p guide.
-    # 3p site: We cut roughly at the start of the 3p guide.
+  for (i in seq_len(n_total)) {
+    utils::setTxtProgressBar(pb, i)
+    if (!has_coords[i]) next
 
-    chr <- pairs_df$seqnames_5p[i] # Assumes both on same chromosome
+    chrom <- as.character(pairs_df$seqnames_5p[i])
+    c5 <- pairs_df$cut_site_5p[i]; c3 <- pairs_df$cut_site_3p[i]
+    cut_s <- min(c5, c3); cut_e <- max(c5, c3)
+    del_size <- abs(c3 - c5)
 
-    # Define "Cut" coordinates roughly for search windows
-    # (Exact cut site isn't strictly necessary for primer placement, just need to be flanking)
+    # Determine Strategy
+    use_strat_b <- del_size > max_wt_amplicon
 
-    if ("cut_site_5p" %in% names(pairs_df)) {
-      c5 <- pairs_df$cut_site_5p[i]
-      c3 <- pairs_df$cut_site_3p[i]
+    if (!use_strat_b) {
+      # === Strategy A (Flanking) ===
+      strategies[i] <- "Flanking"
+      fwd <- scan_region(chrom, cut_s - 500, cut_s - 100, 1)
+      rev <- scan_region(chrom, cut_e + 100, cut_e + 500, -1)
+      if (!is.null(fwd) && !is.null(rev)) {
+        ext_fwd[i] <- fwd$seq; ext_rev[i] <- rev$seq
+        wt_len <- (rev$end - fwd$start + 1)
+        size_wt[i]  <- as.character(wt_len)
+        size_mut[i] <- wt_len - del_size
+      }
     } else {
-      # Fallback approximation
-      c5 <- pairs_df$end_5p[i]
-      c3 <- pairs_df$start_3p[i]
-    }
+      # === Strategy B (Dual Pair) ===
+      strategies[i] <- "Dual_Pair"
+      size_wt[i] <- "Too Large"
 
-    # Ensure ordered (c5 < c3)
-    start_cut <- min(c5, c3)
-    end_cut   <- max(c5, c3)
+      # 1. External Pair
+      fwd <- scan_region(chrom, cut_s - 300, cut_s - 100, 1)
+      rev <- scan_region(chrom, cut_e + 100, cut_e + 300, -1)
+      if (!is.null(fwd) && !is.null(rev)) {
+        ext_fwd[i] <- fwd$seq; ext_rev[i] <- rev$seq
+        size_mut[i] <- (cut_s - fwd$start) + (rev$end - cut_e)
+      }
 
-    # --- Design Forward ---
-    # Look upstream of start_cut
-    # Region: [start_cut - flank_max, start_cut - flank_min]
-    fwd_res <- find_best_primer(chr,
-                                start = start_cut - flank_max,
-                                end = start_cut - flank_min,
-                                direction = 1)
+      # 2. Internal Pair (Memoized)
+      e5_rank <- pairs_df$exon_5p[i]; e3_rank <- pairs_df$exon_3p[i]
+      cache_key <- paste(e5_rank, e3_rank, sep="_")
 
-    # --- Design Reverse ---
-    # Look downstream of end_cut
-    # Region: [end_cut + flank_min, end_cut + flank_max]
-    rev_res <- find_best_primer(chr,
-                                start = end_cut + flank_min,
-                                end = end_cut + flank_max,
-                                direction = -1)
+      if (!is.null(internal_primer_cache[[cache_key]])) {
+        cached <- internal_primer_cache[[cache_key]]
+        int_fwd[i] <- cached$fwd; int_rev[i] <- cached$rev; size_int[i] <- cached$size
+      } else {
+        # Determine internal target window
+        del_exons <- exons_df[exons_df$rank > e5_rank & exons_df$rank < e3_rank, ]
 
-    if (!is.null(fwd_res) && !is.null(rev_res)) {
-      fwd_seqs[i] <- fwd_res$seq
-      rev_seqs[i] <- rev_res$seq
+        search_s <- NA; search_e <- NA
+        use_midpoint <- TRUE
 
-      # WT Amplicon: Distance from Fwd 5' to Rev 5' (on genomic scale) + RevLen
-      # Physically: (Rev_Gen_End) - (Fwd_Gen_Start) + 1
-      # Note: Rev_res returns genomic coordinates of the binding site on the + strand.
-      # Fwd is upstream (lower coord), Rev is downstream (higher coord).
+        # Try to find a valid deleted exon > 100bp
+        if (nrow(del_exons) > 0) {
+          best_ex <- del_exons[which.max(del_exons$end - del_exons$start), ]
+          if ((best_ex$end - best_ex$start) > 100) {
+            search_s <- best_ex$start
+            search_e <- best_ex$end
+            use_midpoint <- FALSE
+          }
+        }
 
-      wt_size <- (rev_res$gen_end - fwd_res$gen_start) + 1
-      wt_sizes[i] <- wt_size
+        # Fallback to deletion midpoint (intron) if no valid exon
+        if (use_midpoint) {
+          mid <- floor((cut_s + cut_e) / 2)
+          search_s <- mid - 200
+          search_e <- mid + 200
+        }
 
-      # Mutant Amplicon: WT - Deletion Size
-      del_size <- if("genomic_deletion_size" %in% names(pairs_df)) pairs_df$genomic_deletion_size[i] else (end_cut - start_cut)
-      mut_sizes[i] <- wt_size - del_size
-    } else {
-      fwd_seqs[i] <- NA_character_
-      rev_seqs[i] <- NA_character_
-      wt_sizes[i] <- NA_integer_
-      mut_sizes[i] <- NA_integer_
+        # Perform Scan
+        int_res <- NULL
+        if (!is.na(search_s) && (search_e - search_s > 100)) {
+          center <- floor((search_s + search_e) / 2)
+          i_fwd <- scan_region(chrom, max(search_s, center-200), center-50, 1)
+          i_rev <- scan_region(chrom, center+50, min(search_e, center+200), -1)
+          if (!is.null(i_fwd) && !is.null(i_rev)) {
+            int_res <- list(fwd = i_fwd$seq, rev = i_rev$seq, size = i_rev$end - i_fwd$start + 1)
+          }
+        }
+
+        # Cache result
+        internal_primer_cache[[cache_key]] <- if(is.null(int_res)) list(fwd=NA, rev=NA, size=NA) else int_res
+
+        if (!is.null(int_res)) {
+          int_fwd[i] <- int_res$fwd; int_rev[i] <- int_res$rev; size_int[i] <- int_res$size
+        }
+      }
     }
   }
+  close(pb)
 
-  # --- Bind results ---
-  pairs_df$primer_fwd <- fwd_seqs
-  pairs_df$primer_rev <- rev_seqs
-  pairs_df$wt_amplicon_size <- wt_sizes
-  pairs_df$mut_amplicon_size <- mut_sizes
+  # --- Assemble Output ---
+  pairs_df$priming_strategy <- strategies
+  pairs_df$primer_ext_fwd   <- ext_fwd
+  pairs_df$primer_ext_rev   <- ext_rev
+  pairs_df$primer_int_fwd   <- int_fwd
+  pairs_df$primer_int_rev   <- int_rev
+  pairs_df$exp_wt_size      <- size_wt
+  pairs_df$exp_mut_size     <- size_mut
+  pairs_df$exp_int_size     <- size_int
 
-  n_success <- sum(!is.na(pairs_df$primer_fwd))
-  message("Primers successfully designed for ", n_success, " / ", nrow(pairs_df), " pairs.")
+  n_succ <- sum(!is.na(pairs_df$primer_ext_fwd))
+  message("\nDesigned primers for ", n_succ, "/", n_total, " pairs.")
 
   return(pairs_df)
 }
