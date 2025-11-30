@@ -13,13 +13,13 @@ score_grnas(
 \arguments{
 \item{grna_gr}{GRanges returned by find_cas9_sites() or find_cas12a_sites().}
 
-\item{method}{Scoring model name.  Default "ruleset1".}
+\item{method}{Scoring model name. Default "ruleset1".}
 }
 \value{
-GRanges with added metadata column \code{ontarget_score} (numeric)
+GRanges with added metadata columns \code{ontarget_score} and \code{scoring_method}.
 }
 \description{
-Handles RuleSet1 (Doench et al., Nat Biotech (2014)) and Azimuth (Doench et al. Nat Biotech (2016) -- in progress) for Cas9 and DeepCpf1 for Cas12.
-Automatically routes DeepCpf1 requests to the internal Python backend
-on Windows to bypass crisprScore OS limitations.
+Handles RuleSet1 and Azimuth (Cas9) and DeepCpf1 (Cas12a).
+Automatically routes DeepCpf1 requests to the internal Python backend on Windows.
+Adds the scoring method to metadata to facilitate downstream thresholding.
 }

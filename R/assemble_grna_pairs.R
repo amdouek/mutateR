@@ -1,110 +1,64 @@
 #' Assemble and annotate gRNA pairs for exon‑flanking deletions
 #'
-#' For each *phase‑compatible* exon pair (E5′, E3′),
-#' gRNAs are selected from the immediately flanking exons
-#' (E5′ + 1 and E3′ – 1).
+#' Merges gRNAs for phase-compatible exon pairs.
+#' Automatically detects scoring method to apply appropriate cutoffs:
+#' - DeepCpf1: > 50
+#' - RuleSet1/Azimuth: > 0.5
 #'
-#' The output merges each gRNA pair’s protospacer/PAM sequences with the
-#' corresponding on‑target scores retrieved directly from the nested
-#' \code{ontarget_score} data.frames in the GRanges metadata.
+#' @param grna_gr GRanges returned by \link{filter_valid_grnas}.
+#' @param exon_gr GRanges from \link{get_exon_structures}(output="GRanges").
+#' @param transcript_id Character. Ensembl transcript ID.
+#' @param species Character. Ensembl species short code.
+#' @param score_cutoff Numeric. Optional. If NULL, auto-selects based on `scoring_method` metadata.
 #'
-#' Each 30‑nt scoring sequence is internally trimmed by removing the
-#' first 4 and last 6 bases (3‑nt PAM + 3‑nt flank) to recover the
-#' 20‑nt protospacer used for matching.
-#'
-#' @param grna_gr        GRanges returned by \link{filter_valid_grnas},
-#'                       containing metadata column \code{ontarget_score}
-#'                       (a data.frame with columns \code{sequence} and \code{score}).
-#' @param exon_gr        GRanges from \link{get_exon_structures}(output="GRanges").
-#' @param transcript_id  Character. Ensembl transcript ID.
-#' @param species        Character. Ensembl species short code (e.g. "hsapiens").
-#' @param score_cutoff   Numeric. Minimum acceptable on‑target score for each gRNA (default 0.6).
-#'
-#' @return A \code{data.frame} where each row represents a candidate
-#'         exon‑flanking gRNA pair with protospacer/PAM sequences,
-#'         matched numeric on‑target scores, frameshift/PTC metadata,
-#'         domain annotation, and a logical \code{recommended} flag.
-#'
-#' @seealso \link{filter_valid_grnas}, \link{check_exon_phase},
-#'          \link{check_frameshift_ptc}, \link{map_protein_domains}
-#'
-#' @examples
-#' \dontrun{
-#' tp53_pairs_df <- assemble_grna_pairs(
-#'   grna_gr       = tp53_valid_grnas,
-#'   exon_gr       = tp53_exons_gr,
-#'   transcript_id = canonical_tx,
-#'   species       = "hsapiens",
-#'   score_cutoff  = 0.6
-#' )
-#' head(tp53_pairs_df)
-#' }
+#' @return A \code{data.frame} of candidate exon‑flanking gRNA pairs.
 #' @export
 assemble_grna_pairs <- function(grna_gr,
                                 exon_gr,
                                 transcript_id,
                                 species,
-                                score_cutoff = 0.5) {
+                                score_cutoff = NULL) {
 
   stopifnot(inherits(grna_gr, "GRanges"))
   message("Assembling gRNA pairs for exon‑flanking deletions...")
 
-  # ---- 1. Flatten on-target scores safely ---------------------------
+  # ---- 1. Determine Score Cutoff ------------------------------------
+  if (is.null(score_cutoff)) {
+    # Check metadata for scoring method
+    method <- if ("scoring_method" %in% names(mcols(grna_gr))) unique(mcols(grna_gr)$scoring_method)[1] else "ruleset1"
+
+    if (!is.na(method) && tolower(method) == "deepcpf1") {
+      score_cutoff <- 50
+      message("Detected DeepCpf1 scores. Using recommended cutoff: ", score_cutoff)
+    } else {
+      score_cutoff <- 0.5
+      message("Detected probability-based scores (e.g. RuleSet1). Using recommended cutoff: ", score_cutoff)
+    }
+  }
+
+  # ---- 2. Flatten on-target scores safely ---------------------------
   raw_scores <- mcols(grna_gr)$ontarget_score
   if (is.numeric(raw_scores)) {
     numeric_scores <- raw_scores
-  } else if (is.data.frame(raw_scores) && "score" %in% names(raw_scores)) {
-    numeric_scores <- suppressWarnings(as.numeric(raw_scores$score))
-  } else if (inherits(raw_scores, "DataFrame") && "score" %in% names(raw_scores)) {
-    numeric_scores <- as.numeric(raw_scores$score)
-  } else if (is.list(raw_scores)) {
-    numeric_scores <- vapply(raw_scores, function(x) {
-      if (is.numeric(x)) return(x[1])
-      if (is.data.frame(x) || inherits(x, "DataFrame")) return(as.numeric(x[[1]][1]))
-      return(NA_real_)
-    }, numeric(1))
   } else {
     numeric_scores <- suppressWarnings(as.numeric(unlist(raw_scores)))
   }
   numeric_scores[is.nan(numeric_scores)] <- NA_real_
 
-  ## ---- 2. Handling for single‑ or two‑exon transcripts (Intragenic) --
+  # ---- 3. Intragenic Mode (≤2 Exons) --------------------------------
   n_exons <- length(exon_gr)
   if (n_exons <= 2) {
     message("Single-exon/two-exon gene detected: constructing intragenic deletion pairs.")
-
     site_df <- as.data.frame(grna_gr)
-
-    # Ensure cut_site exists
-    if (!"cut_site" %in% names(site_df)) {
-      if ("cut_site" %in% names(mcols(grna_gr))) {
-        site_df$cut_site <- mcols(grna_gr)$cut_site
-      } else {
-        site_df$cut_site <- site_df$start
-      }
-    }
-
-    # Derive protospacer if absent
-    if (!"protospacer_sequence" %in% names(site_df)) {
-      if ("sequence_context" %in% names(site_df)) {
-        sc <- as.character(site_df$sequence_context)
-        site_df$protospacer_sequence <- substring(sc, 5, nchar(sc) - 6)
-      } else {
-        site_df$protospacer_sequence <- NA_character_
-      }
-    }
+    if (!"cut_site" %in% names(site_df)) site_df$cut_site <- if("cut_site" %in% names(mcols(grna_gr))) mcols(grna_gr)$cut_site else site_df$start
+    if (!"protospacer_sequence" %in% names(site_df)) site_df$protospacer_sequence <- substring(as.character(site_df$sequence_context), 5, nchar(as.character(site_df$sequence_context)) - 6)
 
     site_df$exon_rank <- if("exon_rank" %in% names(site_df)) site_df$exon_rank else 1L
     site_df$score <- numeric_scores
 
-    if (nrow(site_df) < 2) {
-      warning("Fewer than two scored gRNAs available for pairing.")
-      return(NULL)
-    }
+    if (nrow(site_df) < 2) return(NULL)
 
     comb_idx <- utils::combn(seq_len(nrow(site_df)), 2)
-    g_del_size <- abs(site_df$cut_site[comb_idx[2,]] - site_df$cut_site[comb_idx[1,]])
-
     intragenic <- data.frame(
       protospacer_sequence_5p = site_df$protospacer_sequence[comb_idx[1,]],
       protospacer_sequence_3p = site_df$protospacer_sequence[comb_idx[2,]],
@@ -112,151 +66,97 @@ assemble_grna_pairs <- function(grna_gr,
       ontarget_score_3p       = site_df$score[comb_idx[2,]],
       exon_5p                 = site_df$exon_rank[comb_idx[1,]],
       exon_3p                 = site_df$exon_rank[comb_idx[2,]],
-      genomic_deletion_size   = g_del_size,
-      transcript_deletion_size = g_del_size,
+      cut_site_5p             = site_df$cut_site[comb_idx[1,]],
+      cut_site_3p             = site_df$cut_site[comb_idx[2,]],
+      seqnames_5p             = site_df$seqnames[comb_idx[1,]],
+      genomic_deletion_size   = abs(site_df$cut_site[comb_idx[2,]] - site_df$cut_site[comb_idx[1,]]),
       transcript_id           = transcript_id,
       stringsAsFactors = FALSE
     )
 
-    intragenic <- intragenic[order(-intragenic$genomic_deletion_size), ]
     intragenic$recommended <- with(intragenic,
                                    ontarget_score_5p >= score_cutoff &
                                      ontarget_score_3p >= score_cutoff)
 
-    message("Generated ", nrow(intragenic), " intragenic deletion pairs; ",
-            sum(intragenic$recommended, na.rm=TRUE), " meet score cutoff.")
-
-    intragenic <- intragenic[intragenic$recommended == TRUE, ]
-    return(list(pairs = intragenic, intragenic_mode = TRUE))
+    return(list(pairs = intragenic[intragenic$recommended == TRUE, ], intragenic_mode = TRUE))
   }
 
-  ## ----- 3. Multi-exon logic ------------------------------------------
-  if (exists("intragenic_mode", inherits = FALSE)) return(NULL)
-
+  # ---- 4. Multi-Exon Logic ------------------------------------------
   exon_meta <- as.data.frame(mcols(exon_gr))
   exon_meta$rank <- seq_len(nrow(exon_meta))
   comp_pairs <- check_exon_phase(exon_meta, include_contiguous = FALSE)
   comp_pairs <- subset(comp_pairs, compatible == TRUE)
 
-  if (nrow(comp_pairs) == 0) {
-    warning("No phase‑compatible exon pairs found.")
-    return(NULL)
-  }
+  if (nrow(comp_pairs) == 0) return(NULL)
 
+  # Check Frame
   fs_list <- lapply(seq_len(nrow(comp_pairs)), function(i)
-    with(comp_pairs[i, ],
-         check_frameshift_ptc(exon_meta,
-                              exon_5p = exon_5p,
-                              exon_3p = exon_3p)))
-
+    with(comp_pairs[i, ], check_frameshift_ptc(exon_meta, exon_5p, exon_3p)))
   fs_df <- do.call(rbind, lapply(fs_list, as.data.frame))
   pair_info <- cbind(comp_pairs, fs_df)
-  names(pair_info)[names(pair_info) == "deleted_length"] <- "transcript_deletion_size"
-
-  pair_info$terminal_exon_case <- as.logical(pair_info$terminal_exon_case)
-  pair_info$compatible <- as.logical(pair_info$compatible)
-  pair_info <- subset(pair_info, compatible | terminal_exon_case)
-
   pair_info$target_5p <- pair_info$exon_5p + 1
   pair_info$target_3p <- pair_info$exon_3p - 1
-  pair_info <- subset(pair_info,
-                      target_5p > 0 & target_3p <= nrow(exon_meta) & target_5p < target_3p)
+  pair_info <- subset(pair_info, (compatible == TRUE | terminal_exon_case == TRUE) &
+                        target_5p > 0 & target_3p <= nrow(exon_meta))
 
-  if (nrow(pair_info) == 0) {
-    warning("No eligible flanking exon pairs after bounds filtering.")
-    return(NULL)
-  }
+  if (nrow(pair_info) == 0) return(NULL)
 
-  ## ---- 4. Prepare Guide Dataframe ------------------------------------
+  # Prepare DF
   grna_df <- as.data.frame(grna_gr)
-
-  # Inject clean numeric scores immediately to avoid complex column issues downstream
   grna_df$ontarget_score <- numeric_scores
-
-  # Ensure cut_site is present
-  if (!"cut_site" %in% names(grna_df)) {
-    if ("cut_site" %in% names(mcols(grna_gr))) {
-      grna_df$cut_site <- mcols(grna_gr)$cut_site
-    } else {
-      grna_df$cut_site <- grna_df$start
-    }
-  }
-
+  if (!"cut_site" %in% names(grna_df)) grna_df$cut_site <- if("cut_site" %in% names(mcols(grna_gr))) mcols(grna_gr)$cut_site else grna_df$start
   if (!"exon_rank" %in% names(grna_df)) {
     hits <- GenomicRanges::findOverlaps(grna_gr, exon_gr)
     grna_df$exon_rank <- NA_integer_
     grna_df$exon_rank[queryHits(hits)] <- exon_meta$rank[subjectHits(hits)]
   }
 
-  ## ---- 5. Build Pair Combinations ------------------------------------
-  domain_df <- tryCatch(map_protein_domains(transcript_id, species),
-                        error = \(e) NULL)
+  domain_df <- tryCatch(map_protein_domains(transcript_id, species), error = \(e) NULL)
 
+  # Build Pairs
   results <- list()
-
   for (i in seq_len(nrow(pair_info))) {
-    e5 <- pair_info$target_5p[i]
-    e3 <- pair_info$target_3p[i]
-
+    e5 <- pair_info$target_5p[i]; e3 <- pair_info$target_3p[i]
     g5 <- subset(grna_df, exon_rank == e5)
     g3 <- subset(grna_df, exon_rank == e3)
 
-    if (nrow(g5) == 0 || nrow(g3) == 0) next
+    if (nrow(g5) > 0 && nrow(g3) > 0) {
+      comb <- merge(g5, g3, by = NULL, suffixes = c("_5p", "_3p"))
+      comb$upstream_pair <- pair_info$exon_5p[i]; comb$downstream_pair <- pair_info$exon_3p[i]
+      comb$exon_5p <- e5; comb$exon_3p <- e3
+      comb$compatible <- pair_info$compatible[i]
+      comb$frameshift <- ifelse(pair_info$terminal_exon_case[i], TRUE, pair_info$frameshift[i])
+      comb$ptc_flag   <- ifelse(pair_info$terminal_exon_case[i], FALSE, pair_info$ptc_flag[i])
+      comb$terminal_exon_case <- pair_info$terminal_exon_case[i]
+      comb$genomic_deletion_size <- abs(comb$cut_site_3p - comb$cut_site_5p)
+      comb$transcript_deletion_size <- as.integer(pair_info$deleted_length[i]) # Fix colname
 
-    # Merging here will carry over 'ontarget_score' as 'ontarget_score_5p' and 'ontarget_score_3p'
-    comb <- merge(g5, g3, by = NULL, suffixes = c("_5p", "_3p"))
+      dom_overlap <- if (!is.null(domain_df)) subset(domain_df, exon_rank %in% seq(e5, e3)) else NULL
+      comb$domains <- if (!is.null(dom_overlap) && nrow(dom_overlap) > 0) paste(unique(dom_overlap$domain_desc), collapse = "; ") else NA_character_
 
-    comb$upstream_pair      <- pair_info$exon_5p[i]
-    comb$downstream_pair    <- pair_info$exon_3p[i]
-    comb$exon_5p            <- e5
-    comb$exon_3p            <- e3
-    comb$compatible         <- pair_info$compatible[i]
-    comb$frameshift         <- pair_info$frameshift[i]
-    comb$ptc_flag           <- pair_info$ptc_flag[i]
-    comb$terminal_exon_case <- pair_info$terminal_exon_case[i]
-
-    comb$transcript_deletion_size <- as.integer(pair_info$transcript_deletion_size[i])
-    comb$genomic_deletion_size    <- abs(comb$cut_site_3p - comb$cut_site_5p)
-
-    dom_overlap <- NULL
-    if (!is.null(domain_df) && nrow(domain_df) > 0 && "exon_rank" %in% names(domain_df))
-      dom_overlap <- subset(domain_df, exon_rank %in% seq(e5, e3))
-
-    comb$domains <- if (!is.null(dom_overlap) && nrow(dom_overlap) > 0)
-      paste(unique(dom_overlap$domain_desc), collapse = "; ")
-    else NA_character_
-
-    results[[length(results) + 1]] <- comb
+      results[[length(results) + 1]] <- comb
+    }
   }
 
-  if (!length(results)) {
-    warning("No valid gRNA pairs identified after flanking‑exon search.")
-    return(NULL)
-  }
-
+  if (!length(results)) return(NULL)
   out <- do.call(rbind, results)
 
-  out$ptc_flag <- ifelse(out$terminal_exon_case, FALSE, out$ptc_flag)
-  out$frameshift <- ifelse(out$terminal_exon_case, TRUE, out$frameshift)
-
-  ## ---- 6. Recommended Flag -------------------------------------------
-  # Scores are already present as ontarget_score_5p/3p
+  # Recommended logic
   out$recommended <- with(out,
                           !is.na(ontarget_score_5p) & ontarget_score_5p >= score_cutoff &
                             !is.na(ontarget_score_3p) & ontarget_score_3p >= score_cutoff)
 
-  ## ---- 7. Final Select -----------------------------------------------
+  # Keep Columns
   keep_cols <- c("upstream_pair","downstream_pair","exon_5p","exon_3p",
                  "compatible","frameshift","ptc_flag","terminal_exon_case",
                  "genomic_deletion_size", "transcript_deletion_size",
                  "protospacer_sequence_5p","pam_sequence_5p", "ontarget_score_5p",
                  "protospacer_sequence_3p","pam_sequence_3p", "ontarget_score_3p",
-                 "domains","recommended")
-
-  keep_cols <- intersect(keep_cols, names(out))
-  out <- out[, keep_cols, drop = FALSE]
+                 "domains","recommended",
+                 "seqnames_5p", "start_5p", "end_5p", "cut_site_5p",
+                 "seqnames_3p", "start_3p", "end_3p", "cut_site_3p")
+  out <- out[, intersect(names(out), keep_cols), drop = FALSE]
 
   message("Generated ", nrow(out), " candidate exon‑flanking gRNA pairs.")
-
   return(out)
 }

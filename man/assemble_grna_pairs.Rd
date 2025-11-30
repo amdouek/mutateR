@@ -9,55 +9,28 @@ assemble_grna_pairs(
   exon_gr,
   transcript_id,
   species,
-  score_cutoff = 0.5
+  score_cutoff = NULL
 )
 }
 \arguments{
-\item{grna_gr}{GRanges returned by \link{filter_valid_grnas},
-containing metadata column \code{ontarget_score}
-(a data.frame with columns \code{sequence} and \code{score}).}
+\item{grna_gr}{GRanges returned by \link{filter_valid_grnas}.}
 
 \item{exon_gr}{GRanges from \link{get_exon_structures}(output="GRanges").}
 
 \item{transcript_id}{Character. Ensembl transcript ID.}
 
-\item{species}{Character. Ensembl species short code (e.g. "hsapiens").}
+\item{species}{Character. Ensembl species short code.}
 
-\item{score_cutoff}{Numeric. Minimum acceptable on‑target score for each gRNA (default 0.6).}
+\item{score_cutoff}{Numeric. Optional. If NULL, auto-selects based on \code{scoring_method} metadata.}
 }
 \value{
-A \code{data.frame} where each row represents a candidate
-exon‑flanking gRNA pair with protospacer/PAM sequences,
-matched numeric on‑target scores, frameshift/PTC metadata,
-domain annotation, and a logical \code{recommended} flag.
+A \code{data.frame} of candidate exon‑flanking gRNA pairs.
 }
 \description{
-For each \emph{phase‑compatible} exon pair (E5′, E3′),
-gRNAs are selected from the immediately flanking exons
-(E5′ + 1 and E3′ – 1).
+Merges gRNAs for phase-compatible exon pairs.
+Automatically detects scoring method to apply appropriate cutoffs:
+\itemize{
+\item DeepCpf1: > 50
+\item RuleSet1/Azimuth: > 0.5
 }
-\details{
-The output merges each gRNA pair’s protospacer/PAM sequences with the
-corresponding on‑target scores retrieved directly from the nested
-\code{ontarget_score} data.frames in the GRanges metadata.
-
-Each 30‑nt scoring sequence is internally trimmed by removing the
-first 4 and last 6 bases (3‑nt PAM + 3‑nt flank) to recover the
-20‑nt protospacer used for matching.
-}
-\examples{
-\dontrun{
-tp53_pairs_df <- assemble_grna_pairs(
-  grna_gr       = tp53_valid_grnas,
-  exon_gr       = tp53_exons_gr,
-  transcript_id = canonical_tx,
-  species       = "hsapiens",
-  score_cutoff  = 0.6
-)
-head(tp53_pairs_df)
-}
-}
-\seealso{
-\link{filter_valid_grnas}, \link{check_exon_phase},
-\link{check_frameshift_ptc}, \link{map_protein_domains}
 }

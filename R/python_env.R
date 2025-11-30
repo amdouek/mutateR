@@ -1,7 +1,7 @@
 #' Install the mutateR Python environment
 #'
-#' Sets up a specific Conda environment for mutateR containing
-#' TensorFlow and necessary dependencies.
+#' Sets up a specific Conda environment for mutateR
+#' containing TensorFlow and necessary dependencies.
 #'
 #' @param envname Character. Name of the conda environment (default "r-mutater").
 #' @param python_version Character. Python version to install (default "3.9").
@@ -41,14 +41,12 @@ install_mutater_env <- function(envname = "r-mutater",
     }
   }
 
-  # 3. Create Environment
+  # 3. Create environment
   message("Creating conda environment '", envname, "' with Python ", python_version, "...")
   reticulate::conda_create(envname, python_version = python_version)
 
-  # 4. Install Dependencies
+  # 4. Install dependencies
   # Note: Pinning numpy<2 is currently recommended for TensorFlow compatibility
-  # Using tensorflow-cpu for Windows compatibility.
-  # If on Mac M1/M2, users might need to manually install tensorflow-macos.
   pkgs <- c("tensorflow-cpu", "numpy<2", "h5py", "pandas", "scipy")
 
   message("Installing packages: ", paste(pkgs, collapse = ", "))
@@ -60,6 +58,7 @@ install_mutater_env <- function(envname = "r-mutater",
 #' Activate the mutateR Python environment
 #'
 #' Points the current R session to the mutateR Conda environment.
+#' Automatically handles RETICULATE_PYTHON conflicts.
 #'
 #' @param envname Character. Name of the environment (default "r-mutater").
 #'
@@ -68,54 +67,56 @@ install_mutater_env <- function(envname = "r-mutater",
 activate_mutater_env <- function(envname = "r-mutater") {
   if (!requireNamespace("reticulate", quietly = TRUE)) return(FALSE)
 
-  # 1. Check if Reticulate is ALREADY initialized
+  # 1. Check if reticulate is already initialized
   if (reticulate::py_available()) {
     config <- reticulate::py_config()
 
-    # Robust check: does the path contain our environment name?
-    # (reticulate config$envname is often the full path, not just the name)
-    is_correct <- config$envname == envname || grepl(envname, config$python, fixed = TRUE)
+    # Safe string extraction
+    curr_env <- if (is.null(config$envname) || is.na(config$envname)) "" else config$envname
+    curr_py  <- if (is.null(config$python) || is.na(config$python)) "" else config$python
+
+    # Check if we are already in the correct environment
+    is_correct <- (curr_env == envname) || grepl(envname, curr_py, fixed = TRUE)
 
     if (!is_correct) {
-      warning("Reticulate is already initialized to a different environment: '", config$envname, "'.\n",
+      warning("Reticulate is already initialized to a different environment: '", curr_env, "'.\n",
+              "Path: ", curr_py, "\n",
               "You must RESTART R to switch to '", envname, "'.")
       return(FALSE)
     }
     return(TRUE)
   }
 
-  # 2. Check RETICULATE_PYTHON collision
+  # 2. Check and Fix RETICULATE_PYTHON collision
   sys_ret_py <- Sys.getenv("RETICULATE_PYTHON")
-
   if (sys_ret_py != "") {
     if (!grepl(envname, sys_ret_py, fixed = TRUE)) {
-      message(sprintf(
-        "NOTE: RETICULATE_PYTHON is set to '%s'. This may conflict with mutateR.\n",
-        sys_ret_py
-      ))
-      # We cannot reliably unset it if reticulate already loaded,
-      # so we warn the user instead of silently failing.
+      message("Conflict detected: RETICULATE_PYTHON is set to '", sys_ret_py, "'.")
+      message("Unsetting RETICULATE_PYTHON for this session to allow mutateR environment activation...")
+      Sys.unsetenv("RETICULATE_PYTHON")
     }
   }
 
-  # 3. Attempt Activation
+  # 3. Attempt env activation
   tryCatch({
     reticulate::use_condaenv(envname, required = TRUE)
 
     # 4. Verify
     config <- reticulate::py_config()
+    curr_env <- if (is.null(config$envname) || is.na(config$envname)) "" else config$envname
+    curr_py  <- if (is.null(config$python) || is.na(config$python)) "" else config$python
 
-    if (!grepl(envname, config$python, fixed = TRUE)) {
+    if (!grepl(envname, curr_py, fixed = TRUE)) {
       # Fallback check
-      if(config$envname != envname) {
-        warning("Failed to activate '", envname, "'. Active python: ", config$python)
+      if(curr_env != envname) {
+        warning("Failed to activate '", envname, "'. Active python: ", curr_py)
         return(FALSE)
       }
     }
 
     # 5. Check TensorFlow
     if (!reticulate::py_module_available("tensorflow")) {
-      warning("Environment activated, but TensorFlow not found.")
+      warning("Environment activated, but TensorFlow not found. Try running install_mutater_env(fresh=TRUE).")
       return(FALSE)
     }
 
@@ -135,15 +136,15 @@ activate_mutater_env <- function(envname = "r-mutater") {
 check_mutater_env <- function(envname = "r-mutater") {
   if (!requireNamespace("reticulate", quietly = TRUE)) stop("reticulate missing.")
 
-  # Check 1: Conda List
+  # Check 1: Conda list
   envs <- reticulate::conda_list()
   exists <- envname %in% envs$name
 
   if (!exists) {
-    # If not found by name, check if it's currently active (sometimes conda_list misses paths)
     if (reticulate::py_available()) {
       conf <- reticulate::py_config()
-      if (grepl(envname, conf$python, fixed=TRUE)) exists <- TRUE
+      curr_py <- if (is.null(conf$python) || is.na(conf$python)) "" else conf$python
+      if (grepl(envname, curr_py, fixed=TRUE)) exists <- TRUE
     }
   }
 
@@ -151,16 +152,16 @@ check_mutater_env <- function(envname = "r-mutater") {
     return(FALSE)
   }
 
-  # Check 2: Active Session
-  # We return TRUE if the env exists on disk AND (if python is initialized) it is the correct one.
+  # Check 2: Active session
   if (reticulate::py_available()) {
     conf <- reticulate::py_config()
-    # Check if the path contains the environment name
-    is_correct <- grepl(envname, conf$python, fixed = TRUE) || (conf$envname == envname)
+    curr_env <- if (is.null(conf$envname) || is.na(conf$envname)) "" else conf$envname
+    curr_py  <- if (is.null(conf$python) || is.na(conf$python)) "" else conf$python
+
+    is_correct <- grepl(envname, curr_py, fixed = TRUE) || (curr_env == envname)
     return(is_correct)
   }
 
-  # If Python isn't running yet, but the env exists, we return TRUE
-  # (assuming activation will happen later)
+  # If Python isn't running yet, but the env exists, return TRUE
   return(TRUE)
 }
