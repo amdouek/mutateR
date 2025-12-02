@@ -14,7 +14,7 @@
 filter_valid_grnas <- function(exon_gr,
                                genome,
                                species,
-                               score_method = c("ruleset1","azimuth","deephf","deepcpf1")) {
+                               score_method = c("ruleset1","azimuth","deephf","deepcpf1","deepspcas9")) {
 
   score_method <- match.arg(score_method)
 

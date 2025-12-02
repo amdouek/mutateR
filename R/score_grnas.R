@@ -1,8 +1,7 @@
 #' Score individual gRNAs using crisprScore models
 #'
-#' Handles RuleSet1 and Azimuth (Cas9) and DeepCpf1 (Cas12a).
-#' Automatically routes DeepCpf1 requests to the internal Python backend on Windows.
-#' Adds the scoring method to metadata to facilitate downstream thresholding.
+#' Handles RuleSet1 and Azimuth (Cas9), DeepSpCas9 (Cas9), and DeepCpf1 (Cas12a).
+#' Automatically routes Deep Learning requests to the internal Python backend on Windows.
 #'
 #' @param grna_gr GRanges returned by find_cas9_sites() or find_cas12a_sites().
 #' @param method Scoring model name. Default "ruleset1".
@@ -16,8 +15,10 @@ score_grnas <- function(grna_gr,
   method <- match.arg(method)
   os_is_windows <- identical(.Platform$OS.type, "windows")
 
-  # ---- 1. Unsupported models on Windows (excluding DeepCpf1) ----
-  unsupported_windows <- c("ruleset3","deepspcas9","deephf","enpamgb")
+  # ---- 1. Unsupported models on Windows (DeepSpCas9 is now SUPPORTED) ----
+  # Removed 'deepspcas9' from this list
+  unsupported_windows <- c("ruleset3", "deephf", "enpamgb")
+
   if (os_is_windows && tolower(method) %in% unsupported_windows) {
     warning("The ", method, " model is not supported on Windows. Returning NA scores.")
     mcols(grna_gr)$ontarget_score <- rep(NA_real_, length(grna_gr))
@@ -48,7 +49,7 @@ score_grnas <- function(grna_gr,
 
   scores_raw <- NULL
 
-  # ---- 3. SpCas9 Models -------------------------------------------
+  # ---- 3. SpCas9 Models (Probability-based) -----------------------
   if (tolower(method) == "ruleset1") {
     if (!requireNamespace("crisprScore", quietly = TRUE)) stop("crisprScore required.")
     scores_raw <- crisprScore::getRuleSet1Scores(toupper(seqs))
@@ -56,6 +57,8 @@ score_grnas <- function(grna_gr,
 
   if (tolower(method) == "azimuth") {
     if (!requireNamespace("crisprScore", quietly = TRUE)) stop("crisprScore required.")
+    # Azimuth requires 'NGG' explicitly in the sequence context usually provided by crisprScore
+    # But checking 26,27 allows basic validation against the sequence_context format (30bp)
     valid_idx <- substring(seqs, 26, 27) == "GG"
     scores_vec <- rep(NA_real_, length(seqs))
     if (any(valid_idx)) {
@@ -65,13 +68,50 @@ score_grnas <- function(grna_gr,
     scores_raw <- scores_vec
   }
 
+  # ---- 4. DeepSpCas9 (Internal Backend Integration) ---------------
+  if (tolower(method) == "deepspcas9") {
+    use_internal_backend <- os_is_windows
+
+    if (!use_internal_backend) {
+      if (requireNamespace("crisprScore", quietly = TRUE)) {
+        tryCatch({
+          # Try standard crisprScore first on non-Windows
+          scores_raw <- crisprScore::getDeepSpCas9Scores(toupper(seqs))
+        }, error = function(e) {
+          message("crisprScore DeepSpCas9 failed. Falling back to internal backend.")
+          use_internal_backend <<- TRUE
+        })
+      } else {
+        use_internal_backend <- TRUE
+      }
+    }
+
+    if (use_internal_backend) {
+      message("Using mutateR internal Python backend for DeepSpCas9...")
+      if (!check_mutater_env()) {
+        warning("Python environment not ready. Running install_mutater_env()...")
+        install_mutater_env()
+      }
+      scores_raw <- tryCatch({
+        predict_deepspcas9_python(seqs)
+      }, error = function(e) {
+        warning("DeepSpCas9 inference failed: ", e$message)
+        return(rep(NA_real_, length(seqs)))
+      })
+    }
+  }
+
+  # ---- 5. DeepHF --------------------------------------------------
   if (tolower(method) == "deephf" && !os_is_windows) {
     if (!requireNamespace("crisprScore", quietly = TRUE)) stop("crisprScore required.")
+    # DeepHF expects 23bp: 20bp protospacer + 3bp PAM
+    # Our sequence_context is usually 30bp (4+20+3+3) or 34bp
+    # We strip flanks: indices 5 to 27
     seq23 <- substring(seqs, 5, 27)
     scores_raw <- crisprScore::getDeepHFScores(toupper(seq23))
   }
 
-  # ---- 4. Cas12a Models (DeepCpf1) --------------------------------
+  # ---- 6. Cas12a Models (DeepCpf1) --------------------------------
   if (tolower(method) == "deepcpf1") {
     use_internal_backend <- os_is_windows
 
@@ -102,7 +142,7 @@ score_grnas <- function(grna_gr,
     }
   }
 
-  # ---- 5. Final Formatting ----------------------------------------
+  # ---- 7. Final Formatting ----------------------------------------
   mcols(grna_gr)$ontarget_score <- extract_numeric_scores(scores_raw)
   mcols(grna_gr)$scoring_method <- method
   message("Scored ", length(grna_gr), " guides using ", method, ".")

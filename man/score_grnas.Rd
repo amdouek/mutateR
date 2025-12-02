@@ -19,7 +19,6 @@ score_grnas(
 GRanges with added metadata columns \code{ontarget_score} and \code{scoring_method}.
 }
 \description{
-Handles RuleSet1 and Azimuth (Cas9) and DeepCpf1 (Cas12a).
-Automatically routes DeepCpf1 requests to the internal Python backend on Windows.
-Adds the scoring method to metadata to facilitate downstream thresholding.
+Handles RuleSet1 and Azimuth (Cas9), DeepSpCas9 (Cas9), and DeepCpf1 (Cas12a).
+Automatically routes Deep Learning requests to the internal Python backend on Windows.
 }

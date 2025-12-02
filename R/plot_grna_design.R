@@ -59,7 +59,7 @@ plot_grna_design <- function(exon_gr,
                         transcript_id = transcript_id,
                         gene_symbol = gene_symbol,
                         pairs_df = pairs_df)
-      )
+    )
   }
 
   ## -- Detect intragenic mode ------------------------------------------

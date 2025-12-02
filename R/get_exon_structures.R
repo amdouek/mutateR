@@ -26,20 +26,20 @@
 #' exons_gr <- get_exon_structures(canonical_tx, "hsapiens", output="GRanges")
 #' }
 #' @export
-get_exon_structures <- function(transcript_id, species, 
+get_exon_structures <- function(transcript_id, species,
                                 output = c("data.frame", "GRanges")) {
   if (missing(transcript_id) || missing(species)) {
     stop("You must provide both a transcript_id (see the `get_gene_info()` output) and species.")
   }
   output <- match.arg(output)
-  
+
   if (!requireNamespace("biomaRt", quietly = TRUE)) {
     stop("The 'biomaRt' package is required. Please install it via Bioconductor.")
   }
-  
+
   ensembl <- biomaRt::useEnsembl(biomart = "genes",
                                  dataset = paste0(species, "_gene_ensembl"))
-  
+
   exons <- biomaRt::getBM(
     attributes = c("ensembl_exon_id",
                    "chromosome_name",
@@ -56,21 +56,21 @@ get_exon_structures <- function(transcript_id, species,
     values = transcript_id,
     mart = ensembl
   )
-  
+
   if (nrow(exons) == 0) {
     warning("No exon data found for transcript ", transcript_id)
     return(NULL)
   }
-  
+
   # ----- Rename columns -----
   names(exons)[names(exons) == "phase"] <- "start_phase"
   names(exons)[names(exons) == "cds_length"] <- "transcript_cds_length"
-  
+
   # ----- Convert default numeric strand identifiers to regular +/-/* symbols -----
   exons$strand <- ifelse(exons$strand == 1, "+",
                          ifelse(exons$strand == -1, "-", "*"))
   exons$strand[is.na(exons$strand)] <- "*"
-  
+
   # ----- Ensure columns have proper types -----
   exons$chromosome_name    <- as.character(exons$chromosome_name)
   exons$rank               <- as.integer(exons$rank)
@@ -79,28 +79,28 @@ get_exon_structures <- function(transcript_id, species,
   exons$cds_start          <- as.integer(exons$cds_start)
   exons$cds_end            <- as.integer(exons$cds_end)
   exons$transcript_cds_length <- as.integer(exons$transcript_cds_length)
-  
+
   # ----- Compute exon-specific CDS length -----
   exons$exon_cds_length <- ifelse(
     is.na(exons$cds_start) | is.na(exons$cds_end),
     NA_integer_,
     as.integer(exons$cds_end - exons$cds_start + 1)
   )
-  
+
   # ----- Sort rows by exon rank -----
   exons <- exons[order(exons$rank), ]
-  
+
   # ----- Output as data.frame -----
   if (output == "data.frame") {
     return(exons)
   }
-  
+
   # ----- Output as a GRanges object -----
   if (!requireNamespace("GenomicRanges", quietly = TRUE)) {
     stop("The 'GenomicRanges' package is required for GRanges output.")
   }
   exons <- exons[!is.na(exons$exon_chrom_start) & !is.na(exons$exon_chrom_end), ]
-  
+
   gr <- GenomicRanges::GRanges(
     seqnames = exons$chromosome_name,
     ranges   = IRanges::IRanges(start = exons$exon_chrom_start,
@@ -113,6 +113,6 @@ get_exon_structures <- function(transcript_id, species,
                                  "exon_chrom_start",
                                  "exon_chrom_end",
                                  "strand"))]
-  
+
   return(gr)
 }
