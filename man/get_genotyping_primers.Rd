@@ -28,5 +28,6 @@ The input data frame with added primer columns.
 }
 \description{
 Automatically designs PCR primers to genotype CRISPR-mediated deletions.
-Implements a dynamic strategy based on deletion size with caching for performance.
+Uses the primer3-py backend for thermodynamic accuracy and strict filtering
+(homopolymers, GC clamps, self-dimers).
 }

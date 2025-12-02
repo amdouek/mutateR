@@ -15,8 +15,7 @@ score_grnas <- function(grna_gr,
   method <- match.arg(method)
   os_is_windows <- identical(.Platform$OS.type, "windows")
 
-  # ---- 1. Unsupported models on Windows (DeepSpCas9 is now SUPPORTED) ----
-  # Removed 'deepspcas9' from this list
+  # ---- 1. Unsupported models on Windows ----
   unsupported_windows <- c("ruleset3", "deephf", "enpamgb")
 
   if (os_is_windows && tolower(method) %in% unsupported_windows) {

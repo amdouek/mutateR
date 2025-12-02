@@ -1,7 +1,7 @@
 #' Install the mutateR Python environment
 #'
 #' Sets up a specific Conda environment for mutateR
-#' containing TensorFlow and necessary dependencies.
+#' containing TensorFlow, primer3-py, and necessary dependencies.
 #'
 #' @param envname Character. Name of the conda environment (default "r-mutater").
 #' @param python_version Character. Python version to install (default "3.9").
@@ -47,7 +47,7 @@ install_mutater_env <- function(envname = "r-mutater",
 
   # 4. Install dependencies
   # Note: Pinning numpy<2 is currently recommended for TensorFlow compatibility
-  pkgs <- c("tensorflow-cpu", "numpy<2", "h5py", "pandas", "scipy")
+  pkgs <- c("tensorflow-cpu", "numpy<2", "h5py", "pandas", "scipy", "primer3-py")
 
   message("Installing packages: ", paste(pkgs, collapse = ", "))
   reticulate::conda_install(envname, packages = pkgs, pip = TRUE)
@@ -114,7 +114,7 @@ activate_mutater_env <- function(envname = "r-mutater") {
       }
     }
 
-    # 5. Check TensorFlow
+    # 5. Check TensorFlow (Primary Dependency)
     if (!reticulate::py_module_available("tensorflow")) {
       warning("Environment activated, but TensorFlow not found. Try running install_mutater_env(fresh=TRUE).")
       return(FALSE)

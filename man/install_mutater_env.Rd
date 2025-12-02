@@ -19,5 +19,5 @@ install_mutater_env(
 }
 \description{
 Sets up a specific Conda environment for mutateR
-containing TensorFlow and necessary dependencies.
+containing TensorFlow, primer3-py, and necessary dependencies.
 }
