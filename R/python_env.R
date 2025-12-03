@@ -47,7 +47,7 @@ install_mutater_env <- function(envname = "r-mutater",
 
   # 4. Install dependencies
   # Note: Pinning numpy<2 is currently recommended for TensorFlow compatibility
-  pkgs <- c("tensorflow-cpu", "numpy<2", "h5py", "pandas", "scipy", "primer3-py")
+  pkgs <- c("tensorflow-cpu", "numpy<2", "h5py", "pandas", "scipy", "primer3-py") # We currently don't really need gpu for what we do here, so tensorflow-cpu will suffice
 
   message("Installing packages: ", paste(pkgs, collapse = ", "))
   reticulate::conda_install(envname, packages = pkgs, pip = TRUE)
@@ -67,7 +67,7 @@ install_mutater_env <- function(envname = "r-mutater",
 activate_mutater_env <- function(envname = "r-mutater") {
   if (!requireNamespace("reticulate", quietly = TRUE)) return(FALSE)
 
-  # 1. Check if reticulate is already initialized
+  # 1. Check if reticulate is already initialised
   if (reticulate::py_available()) {
     config <- reticulate::py_config()
 

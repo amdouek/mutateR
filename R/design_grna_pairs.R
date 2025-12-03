@@ -76,7 +76,7 @@ design_grna_pairs <- function(gene_id, species,
     if (tx_id %in% tx_info$all$ensembl_transcript_id) {
       if (!tx_id %in% tx_info$canonical$ensembl_transcript_id) {
         warning("Selected transcript ", tx_id,
-                " is NOT the canonical transcript for ", gene_id)
+                " is NOT the canonical transcript for ", gene_id, ". Please check if this is your intended transcript!")
       }
     } else {
       warning("Transcript ", tx_id, " not found for ", gene_id, " (species: ", species, ").")
@@ -97,7 +97,7 @@ design_grna_pairs <- function(gene_id, species,
     warning("Transcript ", tx_id, " has ", n_total_exons, " total exon(s) (",
             n_coding_exons, " coding). Performing intragenic large‑deletion design.")
 
-    ### ----- Step 2A: Locate gRNA sites (Cas9 only for now) -----
+    ### ----- Step 2A: Locate gRNA sites (NOTE: Cas12a workflow is functional, update function to reflect) -----
     if (nuclease != "Cas9")
       warning("Edge‑case mode currently implemented for Cas9 only.")
 

@@ -2,8 +2,8 @@
 #'
 #' Merges gRNAs for phase-compatible exon pairs.
 #' Automatically detects scoring method to apply appropriate cutoffs:
-#' - DeepCpf1: > 50
-#' - RuleSet1/Azimuth: > 0.5
+#' - DeepCpf1 / DeepSpCas9: > 50
+#' - RuleSet1 / Azimuth: > 0.5
 #'
 #' @param grna_gr GRanges returned by \link{filter_valid_grnas}.
 #' @param exon_gr GRanges from \link{get_exon_structures}(output="GRanges").
@@ -27,12 +27,15 @@ assemble_grna_pairs <- function(grna_gr,
     # Check metadata for scoring method
     method <- if ("scoring_method" %in% names(mcols(grna_gr))) unique(mcols(grna_gr)$scoring_method)[1] else "ruleset1"
 
-    if (!is.na(method) && tolower(method) == "deepcpf1") {
+    # Define regression-based models (Scale 0-100)
+    regression_models <- c("deepcpf1", "deepspcas9")
+
+    if (!is.na(method) && tolower(method) %in% regression_models) {
       score_cutoff <- 50
-      message("Detected DeepCpf1 scores. Using recommended cutoff: ", score_cutoff)
+      message("Detected linear regression scores (", method, "). Using default cutoff: ", score_cutoff)
     } else {
       score_cutoff <- 0.5
-      message("Detected probability-based scores (e.g. RuleSet1). Using recommended cutoff: ", score_cutoff)
+      message("Detected probability-based scores (e.g. ", method, "). Using default cutoff: ", score_cutoff)
     }
   }
 
@@ -101,7 +104,7 @@ assemble_grna_pairs <- function(grna_gr,
 
   if (nrow(pair_info) == 0) return(NULL)
 
-  # Prepare DF
+  # Prepare dataframe
   grna_df <- as.data.frame(grna_gr)
   grna_df$ontarget_score <- numeric_scores
   if (!"cut_site" %in% names(grna_df)) grna_df$cut_site <- if("cut_site" %in% names(mcols(grna_gr))) mcols(grna_gr)$cut_site else grna_df$start
@@ -129,7 +132,7 @@ assemble_grna_pairs <- function(grna_gr,
       comb$ptc_flag   <- ifelse(pair_info$terminal_exon_case[i], FALSE, pair_info$ptc_flag[i])
       comb$terminal_exon_case <- pair_info$terminal_exon_case[i]
       comb$genomic_deletion_size <- abs(comb$cut_site_3p - comb$cut_site_5p)
-      comb$transcript_deletion_size <- as.integer(pair_info$deleted_length[i]) # Fix colname
+      comb$transcript_deletion_size <- as.integer(pair_info$deleted_length[i])
 
       dom_overlap <- if (!is.null(domain_df)) subset(domain_df, exon_rank %in% seq(e5, e3)) else NULL
       comb$domains <- if (!is.null(dom_overlap) && nrow(dom_overlap) > 0) paste(unique(dom_overlap$domain_desc), collapse = "; ") else NA_character_
@@ -141,7 +144,7 @@ assemble_grna_pairs <- function(grna_gr,
   if (!length(results)) return(NULL)
   out <- do.call(rbind, results)
 
-  # Recommended logic
+  # 'Recommended' logic
   out$recommended <- with(out,
                           !is.na(ontarget_score_5p) & ontarget_score_5p >= score_cutoff &
                             !is.na(ontarget_score_3p) & ontarget_score_3p >= score_cutoff)

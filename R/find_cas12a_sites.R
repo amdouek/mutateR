@@ -1,7 +1,7 @@
 #' Find Cas12a (Cpf1) target sites in exons
 #'
 #' Scans exon sequences (both strands) for Cas12a gRNA sites (default PAM "TTTV")
-#' Retrieves full genomic context (34 bp) even if sites are near exon boundaries.
+#' Retrieves full genomic context needed for DeepCpf1 scoring (34 bp) even if sites are near exon boundaries.
 #'
 #'
 #' @param exon_gr GRanges from get_exon_structures(..., output = "GRanges").
@@ -30,11 +30,6 @@ find_cas12a_sites <- function(exon_gr,
   pam_fwd <- Biostrings::DNAString(pam)
   pam_rev <- Biostrings::reverseComplement(pam_fwd)
 
-  # Seq-DeepCpf1 requires 34bp: 4bp upstream + PAM + 23bp Protospacer + 3bp downstream
-  # Total length relative to PAM start: 4 (up) + len(PAM) + 23 (proto) + 3 (down)
-  # Standard Cpf1 PAM is 4bp.
-  # If PAM=4, Proto=23: 4 + 4 + 23 + 3 = 34bp.
-
   for (i in seq_along(exon_gr)) {
     gr <- exon_gr[i]
     exon_seq <- Biostrings::getSeq(genome, gr)[[1]]
@@ -55,10 +50,10 @@ find_cas12a_sites <- function(exon_gr,
         gen_pam_start <- start(gr) + pam_start - 1
         gen_proto_end <- start(gr) + proto_end - 1
 
-        # Calculate Context Coordinates (34bp window)
-        # 4bp upstream of PAM start
+        # Calculate Context Coordinates (34 bp window)
+        # 4 bp upstream of PAM start
         ctx_gen_start <- gen_pam_start - 4
-        # End = Start + 33 (Total 34bp)
+        # End = Start + 33 (Total 34 bp)
         ctx_gen_end   <- ctx_gen_start + 33
 
         # Safe fetch from genome (handles intron/flank)

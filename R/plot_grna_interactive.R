@@ -1,7 +1,7 @@
 #' Interactive gRNA design plot
 #'
 #' Interactive plotting mode for heatmap via plotly.
-#' Handles empty pairs_df gracefully by plotting just the phase compatibility.
+#' If no allowed gRNA pairs, plots just the exon phase compatibility.
 #'
 #' @export
 plot_grna_interactive <- function(exon_gr,
@@ -93,7 +93,7 @@ plot_grna_interactive <- function(exon_gr,
                     formatC(score3p, digits = 3, format = 'f')), "")
     ))
 
-  ## ---- 5. Construct Matrices (Standard Order) ----
+  ## ---- 5. Construct Matrices ----
   merged <- merged[order(merged$exon_3p, merged$exon_5p), ]
 
   zmat      <- matrix(merged$CatNum, nrow = n_exons, ncol = n_exons, byrow = TRUE)

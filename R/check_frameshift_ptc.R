@@ -1,4 +1,4 @@
-#' Assess if an deletion of exon(s) would cause a frameshift/PTC
+#' Assess if deletion of exon(s) would cause a frameshift/PTC
 #'
 #' @param exon_info data.frame with `rank` and `exon_cds_length`
 #' @param exon_5p Integer. Upstream exon rank.

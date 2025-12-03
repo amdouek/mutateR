@@ -7,7 +7,7 @@
 #' @param exon_gr  GRanges from get_exon_structures(output="GRanges").
 #' @param genome   BSgenome object for the relevant species.
 #' @param species  Character, e.g. "hsapiens".
-#' @param score_method Character. One of "ruleset1", "azimuth", or "deephf".
+#' @param score_method Character. One of "ruleset1", "azimuth", "deephf", "deepcpf1" or "deepspcas9".
 #'
 #' @return GRanges of scored, biologically admissible gRNAs.
 #' @export

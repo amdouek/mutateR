@@ -1,7 +1,7 @@
-#' Score individual gRNAs using crisprScore models
+#' On-target scoring for gRNAs
 #'
-#' Handles RuleSet1 and Azimuth (Cas9), DeepSpCas9 (Cas9), and DeepCpf1 (Cas12a).
-#' Automatically routes Deep Learning requests to the internal Python backend on Windows.
+#' Currently handles RuleSet1 and Azimuth (Cas9), DeepSpCas9 (Cas9), and DeepCpf1 (Cas12a).
+#' Automatically routes deep learning methods to the internal Python backend on Windows (requires miniconda and separate env install, see [install_mutater_env()].
 #'
 #' @param grna_gr GRanges returned by find_cas9_sites() or find_cas12a_sites().
 #' @param method Scoring model name. Default "ruleset1".

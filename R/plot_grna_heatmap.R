@@ -103,7 +103,7 @@ plot_grna_heatmap <- function(exon_gr,
       if (!is.null(gene_symbol))
         paste0(transcript_id, " (", gene_symbol, ")")
       else transcript_id,
-      " — Exon phase-compatibility matrix"
+      " - Exon phase-compatibility matrix"
     ))
 
   ## ----- 5. Domain annotation layer ----------------------------------

@@ -5,7 +5,7 @@
 #' 2. Exon phase mapping
 #' 3. gRNA finding & scoring (Cas9 or Cas12a)
 #' 4. Exon-deletion pair assembly (Auto-detects scoring thresholds unless overridden)
-#' 5. Genotyping primer design (Optimised: runs only on recommended pairs)
+#' 5. Genotyping primer design (Runs only on recommended pairs)
 #' 6. Visualisation
 #'
 #' @param gene_id Character. Gene symbol or Ensembl Gene ID (ENSG...).
@@ -60,7 +60,7 @@ run_mutateR <- function(gene_id,
     stop("Please supply a valid BSgenome object.")
 
   if (is.null(score_method)) {
-    score_method <- if (nuclease == "Cas9") "ruleset1" else "deepcpf1"
+    score_method <- if (nuclease == "Cas9") "ruleset1" else "deepcpf1" # Need to amend now that DeepSpCas9 is implemented.
   }
 
   ## ----- Step 1: Gene Info -----

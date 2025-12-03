@@ -32,7 +32,7 @@ run_primer3_python <- function(sequence_template,
     }
   }
 
-  # --- 2. Define Python Function (if not exists) ---
+  # --- 2. Define Python Function (if none exists) ---
   is_defined <- tryCatch({
     reticulate::py_eval("'design_primers_python' in globals()")
   }, error = function(e) FALSE)

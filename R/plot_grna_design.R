@@ -1,10 +1,5 @@
 #' Plot exon structure, phase compatibility and recommended gRNA pairs
 #'
-#' Displays three schematic layers:
-#'   • Top dashed grey arcs – phase‑compatible exon pairs
-#'   • Middle blue rectangles – exons
-#'   • Bottom coloured arcs – recommended gRNA pair targets
-#' Left‑side labels identify each layer.
 #'
 #' @param exon_gr       GRanges from get_exon_structures(output="GRanges")
 #' @param pairs_df      Data frame from assemble_grna_pairs()
@@ -269,7 +264,7 @@ plot_grna_design <- function(exon_gr,
       if (!is.null(gene_symbol))
         paste0(gene_symbol, " (", transcript_id, ")")
       else transcript_id,
-      " — Phase-compatibility", if (no_pairs) "" else " & recommended gRNA pairs"
+      " - Phase-compatibility", if (no_pairs) "" else " & recommended gRNA pairs"
     )) +
     coord_cartesian(clip = "off")
 
