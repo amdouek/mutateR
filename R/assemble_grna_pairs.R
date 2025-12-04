@@ -144,7 +144,43 @@ assemble_grna_pairs <- function(grna_gr,
   if (!length(results)) return(NULL)
   out <- do.call(rbind, results)
 
-  out <- out[out$genomic_deletion_size > 50, ] # Removes rows where the same gRNA was chosen as both 5' and 3' (deletion size = 0), cases where gRNA sequences could overlap (deletion size = 1, etc.) and unreasonably small deletions. 50 bp cutoff is arbitrary, might make more or less stringent in future.
+  # Technical Filter: Minimal deletion size & potential for steric hindrance
+  # Deletions < 50 bp are hard to genotype by agarose gel
+  # Cas effector footprint causing steric hindrance if two RNPs are too close to each other. (Not sure of exact footprint size, but 50 nt between cut sites should probably suffice - check literature).
+  out <- out[out$genomic_deletion_size > 50, ] # Applied 50 bp floor for expected genomic deletion
+
+  if (nrow(out) > 0) {
+    # Biological filter: Residual Exon Mass (REM) ***MAKE SURE TO DOCUMENT THIS LOGIC***
+    # For single-exon targets, ensure the exon is effectively destroyed/skipped.
+    # If a large exon remains mostly intact, the spliceosome will likely include it (causing an internal deletion/frameshift rather than the desired exon skipping).
+
+    # Extract exon widths using the rank metadata
+    ex_widths <- setNames(width(exon_gr), mcols(exon_gr)$rank)
+
+    # Identify single-exon targets (Start Exon == End Exon)
+    is_single_ex <- out$exon_5p == out$exon_3p
+
+    if (any(is_single_ex)) {
+      # Get width of the targeted exon
+      target_w <- ex_widths[as.character(out$exon_5p)]
+      del_s    <- out$genomic_deletion_size
+
+      # Calculate biological metrics (residual exon length after deletion)
+      residual_len <- target_w - del_s
+      destruction_ratio <- del_s / target_w
+
+      # Criteria for keeping single-exon targets:
+      # A. Residual fragment is too small for spliceosome recognition for incorporation into mature mRNA (< 50 bp)
+      # B. The deletion destroys the vast majority of the exon (> 70%), likely destabilizing ESEs
+      biologically_valid <- (residual_len < 50) | (destruction_ratio > 0.70)
+
+      # Keep if: (It is a multi-exon deletion) OR (it passes the biological check)
+      # Note: Multi-exon deletions (e.g. cutting E4 and E6) are always kept because they remove the intervening introns/splice-sites.
+      to_keep <- (!is_single_ex) | biologically_valid
+
+      out <- out[to_keep, ]
+    }
+  }
 
   if (nrow(out) == 0) return(NULL)
 
