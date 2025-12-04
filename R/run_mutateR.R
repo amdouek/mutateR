@@ -114,6 +114,13 @@ run_mutateR <- function(gene_id,
                 plot = generate_early_plot(NULL)))
   }
 
+  # --- Step 3A: PAM Distribution Reporting ---
+  if (!quiet && "pam_sequence" %in% names(mcols(hits))) {
+    pam_counts <- table(hits$pam_sequence)
+    message("PAM distribution:")
+    print(pam_counts)
+  }
+
   ## ----- Step 4: Scoring -----
   if (!quiet) message("Scoring gRNAs using model: ", score_method)
 

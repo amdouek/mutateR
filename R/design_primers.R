@@ -20,7 +20,7 @@ get_genotyping_primers <- function(pairs_df,
 
   if (is.null(pairs_df) || nrow(pairs_df) == 0) return(pairs_df)
 
-  # --- Input Validation ---
+  # --- 1. Coordinate Validation ---
   if (!all(c("cut_site_5p", "cut_site_3p") %in% names(pairs_df))) {
     if ("end_5p" %in% names(pairs_df)) pairs_df$cut_site_5p <- pairs_df$end_5p
     if ("start_3p" %in% names(pairs_df)) pairs_df$cut_site_3p <- pairs_df$start_3p
@@ -30,26 +30,42 @@ get_genotyping_primers <- function(pairs_df,
     !is.na(pairs_df$cut_site_3p) &
     !is.na(pairs_df$seqnames_5p)
 
-  if (sum(!has_coords) > 0) warning("Skipping ", sum(!has_coords), " pairs due to missing coordinate data.")
+  if (sum(!has_coords) > 0) {
+    warning("Dropping ", sum(!has_coords), " pairs due to missing coordinate data.")
+    pairs_df <- pairs_df[has_coords, ]
+  }
 
+  if (nrow(pairs_df) == 0) return(pairs_df)
+
+  # --- 2. Filter Identical Cut Sites (0 bp Deletions) ---
+  is_distinct <- pairs_df$cut_site_5p != pairs_df$cut_site_3p
+  if (any(!is_distinct)) {
+    pairs_df <- pairs_df[is_distinct, ]
+  }
+
+  if (nrow(pairs_df) == 0) return(pairs_df)
+
+  # --- Setup Variables ---
   n_total <- nrow(pairs_df)
   exons_df <- as.data.frame(exons_gr)
   padding <- 600
 
-  # --- Batch Preparation Variables ---
-  batch_requests <- list()     # The list of dicts to send to Python
-  internal_cache <- list()     # Key: "e5_e3", Value: batch_index (integer)
-
-  # Map assignments: List of lists(row_idx, type, batch_idx, extra_data)
-  # This decouples the Request ID from the Dataframe Row ID
+  batch_requests <- list()
+  internal_cache <- list()
   pending_assignments <- list()
 
-  # Vectors to store final results (pre-allocated)
   strategies <- rep(NA_character_, n_total)
   ext_fwd    <- rep(NA_character_, n_total); ext_rev <- rep(NA_character_, n_total)
   int_fwd    <- rep(NA_character_, n_total); int_rev <- rep(NA_character_, n_total)
   size_wt    <- rep(NA_character_, n_total); size_mut <- rep(NA_integer_, n_total)
   size_int   <- rep(NA_integer_, n_total)
+
+  # --- Helper: Safe Sequence Fetching ---
+  safe_get_seq <- function(...) {
+    val <- tryCatch(as.character(Biostrings::getSeq(...)), error = function(e) "")
+    if (length(val) == 0) return("")
+    return(val)
+  }
 
   message("Preparing primer design batch requests...")
   pb <- utils::txtProgressBar(min = 0, max = n_total, style = 3)
@@ -57,7 +73,6 @@ get_genotyping_primers <- function(pairs_df,
   # --- PHASE 1: Build Requests in R ---
   for (i in seq_len(n_total)) {
     utils::setTxtProgressBar(pb, i)
-    if (!has_coords[i]) next
 
     chrom <- as.character(pairs_df$seqnames_5p[i])
     c5 <- pairs_df$cut_site_5p[i]; c3 <- pairs_df$cut_site_3p[i]
@@ -67,21 +82,18 @@ get_genotyping_primers <- function(pairs_df,
     use_strat_b <- del_size > max_wt_amplicon
 
     if (!use_strat_b) {
-      # ---- Strategy A: Flanking Pair (Standard) ----
+      # ---- Strategy A: Flanking Pair ----
       strategies[i] <- "Flanking"
 
       tmpl_start <- max(1, cut_s - padding)
       tmpl_end   <- cut_e + padding
 
-      seq_dna <- tryCatch({
-        as.character(Biostrings::getSeq(genome, names=chrom, start=tmpl_start, end=tmpl_end))
-      }, error = function(e) NULL)
+      seq_dna <- safe_get_seq(genome, names=chrom, start=tmpl_start, end=tmpl_end)
 
-      if (!is.null(seq_dna) && nchar(seq_dna) > 0) {
+      if (nchar(seq_dna) > 0) {
         rel_start <- cut_s - tmpl_start
         rel_len   <- cut_e - cut_s
 
-        # Add to batch
         req <- list(
           sequence_template = seq_dna,
           target_start = rel_start,
@@ -92,32 +104,26 @@ get_genotyping_primers <- function(pairs_df,
         )
 
         batch_requests[[length(batch_requests) + 1]] <- req
-
-        # Assign this batch ID to this row
         pending_assignments[[length(pending_assignments) + 1]] <- list(
-          row = i,
-          type = "ext_stratA",
-          batch_idx = length(batch_requests),
-          del_size = del_size
+          row = i, type = "ext_stratA", batch_idx = length(batch_requests), del_size = del_size
         )
       }
 
     } else {
-      # ---- Strategy B: Dual Pair (Large Deletion) ----
+      # ---- Strategy B: Dual Pair ----
       strategies[i] <- "Dual_Pair"
       size_wt[i] <- "Too Large"
 
       # -- B1. External Pair (Mutant Detection) --
-      # Simulate mutant allele by joining upstream and downstream
-      up_seq <- tryCatch(as.character(Biostrings::getSeq(genome, names=chrom, start=cut_s-400, end=cut_s)), error=function(e) "")
-      dn_seq <- tryCatch(as.character(Biostrings::getSeq(genome, names=chrom, start=cut_e, end=cut_e+400)), error=function(e) "")
+      up_seq <- safe_get_seq(genome, names=chrom, start=cut_s-400, end=cut_s)
+      dn_seq <- safe_get_seq(genome, names=chrom, start=cut_e, end=cut_e+400)
 
       if (nchar(up_seq) > 0 && nchar(dn_seq) > 0) {
         mut_templ <- paste0(up_seq, dn_seq)
 
         req_ext <- list(
           sequence_template = mut_templ,
-          target_start = 400, # Junction is at 400
+          target_start = 400,
           target_len = 0,
           tm_opt = target_tm,
           prod_min = 150,
@@ -126,52 +132,48 @@ get_genotyping_primers <- function(pairs_df,
 
         batch_requests[[length(batch_requests) + 1]] <- req_ext
         pending_assignments[[length(pending_assignments) + 1]] <- list(
-          row = i,
-          type = "ext_stratB",
-          batch_idx = length(batch_requests)
+          row = i, type = "ext_stratB", batch_idx = length(batch_requests)
         )
       }
 
       # -- B2. Internal Pair (WT Detection) --
-      # Detects a region that SHOULD be deleted.
       e5_rank <- pairs_df$exon_5p[i]; e3_rank <- pairs_df$exon_3p[i]
       cache_key <- paste(e5_rank, e3_rank, sep="_")
 
       if (!is.null(internal_cache[[cache_key]])) {
-        # Hit! Use existing batch request
-        existing_idx <- internal_cache[[cache_key]]
+        # Hit!
         pending_assignments[[length(pending_assignments) + 1]] <- list(
-          row = i,
-          type = "int",
-          batch_idx = existing_idx
+          row = i, type = "int", batch_idx = internal_cache[[cache_key]]
         )
       } else {
-        # Miss! Create new request
+        # Miss!
         del_exons <- exons_df[exons_df$rank > e5_rank & exons_df$rank < e3_rank, ]
         target_s <- NA; target_e <- NA
 
         # Priority 1: Largest deleted exon
         if (nrow(del_exons) > 0) {
-          best_ex <- del_exons[which.max(del_exons$exon_chrom_end - del_exons$exon_chrom_start), ]
-          w <- best_ex$exon_chrom_end - best_ex$exon_chrom_start
-          if (w > 80) {
-            target_s <- best_ex$exon_chrom_start
-            target_e <- best_ex$exon_chrom_end
+          # FIX: Use 'end' and 'start' (GRanges defaults) instead of 'exon_chrom_end/start'
+          # which are stripped when converting GRanges -> data.frame
+          best_ex <- del_exons[which.max(del_exons$end - del_exons$start), ]
+          w <- best_ex$end - best_ex$start
+
+          # Ensure w is not empty/NA before comparison
+          if (length(w) > 0 && !is.na(w) && w > 80) {
+            target_s <- best_ex$start
+            target_e <- best_ex$end
           }
         }
 
-        # Priority 2: Midpoint of deletion (Intron)
+        # Priority 2: Midpoint of deletion
         if (is.na(target_s)) {
           mid <- floor((cut_s + cut_e) / 2)
           target_s <- mid - 200
           target_e <- mid + 200
         }
 
-        int_seq <- tryCatch({
-          as.character(Biostrings::getSeq(genome, names=chrom, start=target_s, end=target_e))
-        }, error = function(e) NULL)
+        int_seq <- safe_get_seq(genome, names=chrom, start=target_s, end=target_e)
 
-        if (!is.null(int_seq) && nchar(int_seq) > 100) {
+        if (nchar(int_seq) > 100) {
           mid_idx <- floor(nchar(int_seq) / 2)
 
           req_int <- list(
@@ -185,15 +187,10 @@ get_genotyping_primers <- function(pairs_df,
 
           batch_requests[[length(batch_requests) + 1]] <- req_int
           new_idx <- length(batch_requests)
-
-          # Update Cache
           internal_cache[[cache_key]] <- new_idx
 
-          # Assign
           pending_assignments[[length(pending_assignments) + 1]] <- list(
-            row = i,
-            type = "int",
-            batch_idx = new_idx
+            row = i, type = "int", batch_idx = new_idx
           )
         }
       }
@@ -219,6 +216,8 @@ get_genotyping_primers <- function(pairs_df,
     message("Mapping results to dataframe...")
 
     for (assign in pending_assignments) {
+      if (assign$batch_idx > length(batch_results)) next
+
       res <- batch_results[[assign$batch_idx]]
       r_idx <- assign$row
 
@@ -243,7 +242,6 @@ get_genotyping_primers <- function(pairs_df,
     }
   }
 
-  # --- Assemble Output ---
   pairs_df$priming_strategy <- strategies
   pairs_df$primer_ext_fwd   <- ext_fwd
   pairs_df$primer_ext_rev   <- ext_rev
