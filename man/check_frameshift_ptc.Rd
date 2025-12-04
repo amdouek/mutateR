@@ -2,7 +2,7 @@
 % Please edit documentation in R/check_frameshift_ptc.R
 \name{check_frameshift_ptc}
 \alias{check_frameshift_ptc}
-\title{Assess if an deletion of exon(s) would cause a frameshift/PTC}
+\title{Assess if deletion of exon(s) would cause a frameshift/PTC}
 \usage{
 check_frameshift_ptc(exon_info, exon_5p, exon_3p)
 }
@@ -18,5 +18,5 @@ List with frameshift (logical), ptc_flag (logical),
 terminal_exon_case (logical), and deleted_length (integer).
 }
 \description{
-Assess if an deletion of exon(s) would cause a frameshift/PTC
+Assess if deletion of exon(s) would cause a frameshift/PTC
 }

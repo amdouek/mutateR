@@ -11,5 +11,5 @@ Path to the weights file (.h5).
 }
 \description{
 Retrieves the path to the embedded DeepCpf1 weights file.
-Note: The weights used is for the Seq-DeepCpf1 model (solely sequence-dependent)
+Note: The weights used is for the Seq-DeepCpf1 model (solely sequence-dependent). The better-performing DeepCpf1 model integrates chromatin accessibility data, but this is cell-line specific rather than useful across organisms, and so is not implemented here.
 }

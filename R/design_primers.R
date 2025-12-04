@@ -1,8 +1,8 @@
-#' Design genotyping primers for mutateR-designed deletions
+#' Design genotyping primers for mutateR-designed deletions (Batched)
 #'
 #' Automatically designs PCR primers to genotype CRISPR-mediated deletions.
-#' Uses the primer3-py backend for thermodynamic accuracy and strict filtering
-#' (homopolymers, GC clamps, self-dimers).
+#' Uses the primer3-py backend for thermodynamic accuracy.
+#' Optimized with batch processing to reduce R-Python overhead.
 #'
 #' @param pairs_df Data frame returned by \code{assemble_grna_pairs}.
 #' @param exons_gr GRanges object of exon structures.
@@ -33,21 +33,28 @@ get_genotyping_primers <- function(pairs_df,
   if (sum(!has_coords) > 0) warning("Skipping ", sum(!has_coords), " pairs due to missing coordinate data.")
 
   n_total <- nrow(pairs_df)
+  exons_df <- as.data.frame(exons_gr)
+  padding <- 600
 
-  # --- Setup Output Vectors ---
+  # --- Batch Preparation Variables ---
+  batch_requests <- list()     # The list of dicts to send to Python
+  internal_cache <- list()     # Key: "e5_e3", Value: batch_index (integer)
+
+  # Map assignments: List of lists(row_idx, type, batch_idx, extra_data)
+  # This decouples the Request ID from the Dataframe Row ID
+  pending_assignments <- list()
+
+  # Vectors to store final results (pre-allocated)
   strategies <- rep(NA_character_, n_total)
   ext_fwd    <- rep(NA_character_, n_total); ext_rev <- rep(NA_character_, n_total)
   int_fwd    <- rep(NA_character_, n_total); int_rev <- rep(NA_character_, n_total)
   size_wt    <- rep(NA_character_, n_total); size_mut <- rep(NA_integer_, n_total)
   size_int   <- rep(NA_integer_, n_total)
 
-  # --- Cache for Internal Primers (Strategy B) ---
-  internal_primer_cache <- list()
-  exons_df <- as.data.frame(exons_gr)
-
-  message("Designing primers via Primer3 (Python backend)...")
+  message("Preparing primer design batch requests...")
   pb <- utils::txtProgressBar(min = 0, max = n_total, style = 3)
 
+  # --- PHASE 1: Build Requests in R ---
   for (i in seq_len(n_total)) {
     utils::setTxtProgressBar(pb, i)
     if (!has_coords[i]) next
@@ -57,17 +64,12 @@ get_genotyping_primers <- function(pairs_df,
     cut_s <- min(c5, c3); cut_e <- max(c5, c3)
     del_size <- abs(c3 - c5)
 
-    # Padding for template extraction
-    padding <- 600
-
-    # Determine Strategy
     use_strat_b <- del_size > max_wt_amplicon
 
-    # ---- Strategy A: Flanking Pair (Standard) ----
     if (!use_strat_b) {
+      # ---- Strategy A: Flanking Pair (Standard) ----
       strategies[i] <- "Flanking"
 
-      # 1. Fetch Template (WT)
       tmpl_start <- max(1, cut_s - padding)
       tmpl_end   <- cut_e + padding
 
@@ -76,79 +78,79 @@ get_genotyping_primers <- function(pairs_df,
       }, error = function(e) NULL)
 
       if (!is.null(seq_dna) && nchar(seq_dna) > 0) {
-        # 2. Define Target (Relative)
-        # Target is the deletion span. Primer3 must design OUTSIDE this.
         rel_start <- cut_s - tmpl_start
         rel_len   <- cut_e - cut_s
 
-        # 3. Call Python
-        p_res <- run_primer3_python(
+        # Add to batch
+        req <- list(
           sequence_template = seq_dna,
           target_start = rel_start,
           target_len = rel_len,
           tm_opt = target_tm,
-          prod_min = rel_len + 80,   # Min amplicon = deletion + flanks
-          prod_max = rel_len + 1000  # Max amplicon
+          prod_min = rel_len + 80,
+          prod_max = rel_len + 1000
         )
 
-        if (!is.null(p_res)) {
-          ext_fwd[i] <- p_res$fwd_seq
-          ext_rev[i] <- p_res$rev_seq
-          size_wt[i] <- as.character(p_res$prod_size)
-          size_mut[i] <- p_res$prod_size - del_size
-        }
+        batch_requests[[length(batch_requests) + 1]] <- req
+
+        # Assign this batch ID to this row
+        pending_assignments[[length(pending_assignments) + 1]] <- list(
+          row = i,
+          type = "ext_stratA",
+          batch_idx = length(batch_requests),
+          del_size = del_size
+        )
       }
 
     } else {
-      # ---- Strategy B: Dual Pair (Internal + External) ----
+      # ---- Strategy B: Dual Pair (Large Deletion) ----
       strategies[i] <- "Dual_Pair"
       size_wt[i] <- "Too Large"
 
-      # --- B1. External Pair (Mutant Band Detection) ---
-      # Simulate the mutant allele by joining upstream and downstream sequences.
-      # This allows Primer3 to "see" the post-deletion product size accurately.
-
+      # -- B1. External Pair (Mutant Detection) --
+      # Simulate mutant allele by joining upstream and downstream
       up_seq <- tryCatch(as.character(Biostrings::getSeq(genome, names=chrom, start=cut_s-400, end=cut_s)), error=function(e) "")
       dn_seq <- tryCatch(as.character(Biostrings::getSeq(genome, names=chrom, start=cut_e, end=cut_e+400)), error=function(e) "")
 
       if (nchar(up_seq) > 0 && nchar(dn_seq) > 0) {
         mut_templ <- paste0(up_seq, dn_seq)
-        # Junction is at index 400 (length of up_seq)
 
-        p_res <- run_primer3_python(
+        req_ext <- list(
           sequence_template = mut_templ,
-          target_start = 400, # Target the junction
-          target_len = 0,     # Zero length target forces primers around this point
+          target_start = 400, # Junction is at 400
+          target_len = 0,
           tm_opt = target_tm,
-          prod_min = 150,     # Standard small amplicon for genotyping
+          prod_min = 150,
           prod_max = 600
         )
 
-        if (!is.null(p_res)) {
-          ext_fwd[i] <- p_res$fwd_seq
-          ext_rev[i] <- p_res$rev_seq
-          size_mut[i] <- p_res$prod_size
-        }
+        batch_requests[[length(batch_requests) + 1]] <- req_ext
+        pending_assignments[[length(pending_assignments) + 1]] <- list(
+          row = i,
+          type = "ext_stratB",
+          batch_idx = length(batch_requests)
+        )
       }
 
-      # --- B2. Internal Pair (WT Band Detection) ---
+      # -- B2. Internal Pair (WT Detection) --
       # Detects a region that SHOULD be deleted.
-
       e5_rank <- pairs_df$exon_5p[i]; e3_rank <- pairs_df$exon_3p[i]
       cache_key <- paste(e5_rank, e3_rank, sep="_")
 
-      if (!is.null(internal_primer_cache[[cache_key]])) {
-        cached <- internal_primer_cache[[cache_key]]
-        int_fwd[i]  <- cached$fwd
-        int_rev[i]  <- cached$rev
-        size_int[i] <- cached$size
+      if (!is.null(internal_cache[[cache_key]])) {
+        # Hit! Use existing batch request
+        existing_idx <- internal_cache[[cache_key]]
+        pending_assignments[[length(pending_assignments) + 1]] <- list(
+          row = i,
+          type = "int",
+          batch_idx = existing_idx
+        )
       } else {
-        # Define internal region
+        # Miss! Create new request
         del_exons <- exons_df[exons_df$rank > e5_rank & exons_df$rank < e3_rank, ]
-
         target_s <- NA; target_e <- NA
 
-        # Priority 1: Largest deleted exon (functional relevance)
+        # Priority 1: Largest deleted exon
         if (nrow(del_exons) > 0) {
           best_ex <- del_exons[which.max(del_exons$exon_chrom_end - del_exons$exon_chrom_start), ]
           w <- best_ex$exon_chrom_end - best_ex$exon_chrom_start
@@ -165,16 +167,14 @@ get_genotyping_primers <- function(pairs_df,
           target_e <- mid + 200
         }
 
-        # Fetch sequence
         int_seq <- tryCatch({
           as.character(Biostrings::getSeq(genome, names=chrom, start=target_s, end=target_e))
         }, error = function(e) NULL)
 
         if (!is.null(int_seq) && nchar(int_seq) > 100) {
-          # Target the middle of this sequence to ensure robust design
           mid_idx <- floor(nchar(int_seq) / 2)
 
-          i_res <- run_primer3_python(
+          req_int <- list(
             sequence_template = int_seq,
             target_start = mid_idx,
             target_len = 0,
@@ -183,20 +183,65 @@ get_genotyping_primers <- function(pairs_df,
             prod_max = min(400, nchar(int_seq))
           )
 
-          # Cache and Assign
-          if (!is.null(i_res)) {
-            internal_primer_cache[[cache_key]] <- list(fwd=i_res$fwd_seq, rev=i_res$rev_seq, size=i_res$prod_size)
-            int_fwd[i]  <- i_res$fwd_seq
-            int_rev[i]  <- i_res$rev_seq
-            size_int[i] <- i_res$prod_size
-          } else {
-            internal_primer_cache[[cache_key]] <- list(fwd=NA, rev=NA, size=NA)
-          }
+          batch_requests[[length(batch_requests) + 1]] <- req_int
+          new_idx <- length(batch_requests)
+
+          # Update Cache
+          internal_cache[[cache_key]] <- new_idx
+
+          # Assign
+          pending_assignments[[length(pending_assignments) + 1]] <- list(
+            row = i,
+            type = "int",
+            batch_idx = new_idx
+          )
         }
       }
     }
   }
   close(pb)
+
+  # --- PHASE 2: Execute Batch in Python ---
+  if (length(batch_requests) > 0) {
+    message("Running Batch Primer3 (", length(batch_requests), " designs)...")
+    batch_results <- tryCatch({
+      run_primer3_batch(batch_requests)
+    }, error = function(e) {
+      warning("Python batch execution failed: ", e$message)
+      return(NULL)
+    })
+  } else {
+    batch_results <- NULL
+  }
+
+  # --- PHASE 3: Process Results ---
+  if (!is.null(batch_results)) {
+    message("Mapping results to dataframe...")
+
+    for (assign in pending_assignments) {
+      res <- batch_results[[assign$batch_idx]]
+      r_idx <- assign$row
+
+      if (!is.null(res)) {
+        if (assign$type == "ext_stratA") {
+          ext_fwd[r_idx] <- res$fwd_seq
+          ext_rev[r_idx] <- res$rev_seq
+          size_wt[r_idx] <- as.character(res$prod_size)
+          size_mut[r_idx] <- res$prod_size - assign$del_size
+        }
+        else if (assign$type == "ext_stratB") {
+          ext_fwd[r_idx] <- res$fwd_seq
+          ext_rev[r_idx] <- res$rev_seq
+          size_mut[r_idx] <- res$prod_size
+        }
+        else if (assign$type == "int") {
+          int_fwd[r_idx] <- res$fwd_seq
+          int_rev[r_idx] <- res$rev_seq
+          size_int[r_idx] <- res$prod_size
+        }
+      }
+    }
+  }
 
   # --- Assemble Output ---
   pairs_df$priming_strategy <- strategies
@@ -209,7 +254,7 @@ get_genotyping_primers <- function(pairs_df,
   pairs_df$exp_int_size     <- size_int
 
   n_succ <- sum(!is.na(pairs_df$primer_ext_fwd))
-  message("\nDesigned primers for ", n_succ, "/", n_total, " pairs.")
+  message("Designed primers for ", n_succ, "/", n_total, " pairs.")
 
   return(pairs_df)
 }

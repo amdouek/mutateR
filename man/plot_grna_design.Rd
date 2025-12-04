@@ -33,9 +33,5 @@ Default NULL (shows all recommended pairs).}
 A ggplot object
 }
 \description{
-Displays three schematic layers:
-• Top dashed grey arcs – phase‑compatible exon pairs
-• Middle blue rectangles – exons
-• Bottom coloured arcs – recommended gRNA pair targets
-Left‑side labels identify each layer.
+Plot exon structure, phase compatibility and recommended gRNA pairs
 }

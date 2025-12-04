@@ -69,7 +69,7 @@ Executes all major steps of the mutateR pipeline end‑to‑end:
 \item Exon phase mapping
 \item gRNA finding & scoring (Cas9 or Cas12a)
 \item Exon-deletion pair assembly (Auto-detects scoring thresholds unless overridden)
-\item Genotyping primer design (Optimised: runs only on recommended pairs)
+\item Genotyping primer design (Runs only on recommended pairs)
 \item Visualisation
 }
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/score_grnas.R
 \name{score_grnas}
 \alias{score_grnas}
-\title{Score individual gRNAs using crisprScore models}
+\title{On-target scoring for gRNAs}
 \usage{
 score_grnas(
   grna_gr,
@@ -19,6 +19,6 @@ score_grnas(
 GRanges with added metadata columns \code{ontarget_score} and \code{scoring_method}.
 }
 \description{
-Handles RuleSet1 and Azimuth (Cas9), DeepSpCas9 (Cas9), and DeepCpf1 (Cas12a).
-Automatically routes Deep Learning requests to the internal Python backend on Windows.
+Currently handles RuleSet1 and Azimuth (Cas9), DeepSpCas9 (Cas9), and DeepCpf1 (Cas12a).
+Automatically routes deep learning methods to the internal Python backend on Windows (requires miniconda and separate env install, see \code{\link[=install_mutater_env]{install_mutater_env()}}.
 }

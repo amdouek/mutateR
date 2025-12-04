@@ -18,7 +18,7 @@ filter_valid_grnas(
 
 \item{species}{Character, e.g. "hsapiens".}
 
-\item{score_method}{Character. One of "ruleset1", "azimuth", or "deephf".}
+\item{score_method}{Character. One of "ruleset1", "azimuth", "deephf", "deepcpf1" or "deepspcas9".}
 }
 \value{
 GRanges of scored, biologically admissible gRNAs.

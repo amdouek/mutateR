@@ -2,7 +2,7 @@
 % Please edit documentation in R/design_primers.R
 \name{get_genotyping_primers}
 \alias{get_genotyping_primers}
-\title{Design genotyping primers for mutateR-designed deletions}
+\title{Design genotyping primers for mutateR-designed deletions (Batched)}
 \usage{
 get_genotyping_primers(
   pairs_df,
@@ -28,6 +28,6 @@ The input data frame with added primer columns.
 }
 \description{
 Automatically designs PCR primers to genotype CRISPR-mediated deletions.
-Uses the primer3-py backend for thermodynamic accuracy and strict filtering
-(homopolymers, GC clamps, self-dimers).
+Uses the primer3-py backend for thermodynamic accuracy.
+Optimized with batch processing to reduce R-Python overhead.
 }

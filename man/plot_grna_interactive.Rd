@@ -14,5 +14,5 @@ plot_grna_interactive(
 }
 \description{
 Interactive plotting mode for heatmap via plotly.
-Handles empty pairs_df gracefully by plotting just the phase compatibility.
+If no allowed gRNA pairs, plots just the exon phase compatibility.
 }

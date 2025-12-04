@@ -27,7 +27,7 @@ assemble_grna_pairs <- function(grna_gr,
     # Check metadata for scoring method
     method <- if ("scoring_method" %in% names(mcols(grna_gr))) unique(mcols(grna_gr)$scoring_method)[1] else "ruleset1"
 
-    # Define regression-based models (Scale 0-100)
+    # Define regression-based models
     regression_models <- c("deepcpf1", "deepspcas9")
 
     if (!is.na(method) && tolower(method) %in% regression_models) {
@@ -143,6 +143,10 @@ assemble_grna_pairs <- function(grna_gr,
 
   if (!length(results)) return(NULL)
   out <- do.call(rbind, results)
+
+  out <- out[out$genomic_deletion_size > 50, ] # Removes rows where the same gRNA was chosen as both 5' and 3' (deletion size = 0), cases where gRNA sequences could overlap (deletion size = 1, etc.) and unreasonably small deletions. 50 bp cutoff is arbitrary, might make more or less stringent in future.
+
+  if (nrow(out) == 0) return(NULL)
 
   # 'Recommended' logic
   out$recommended <- with(out,

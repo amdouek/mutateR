@@ -155,7 +155,7 @@ run_mutateR <- function(gene_id,
     if (!quiet) message("Detected intragenic assembly mode (≤2 exons).")
   }
 
-  ## ----- Step 7: Primer Design (Optimized) -----
+  ## ----- Step 7: Primer Design -----
   if (design_primers && !is.null(pairs_df) && nrow(pairs_df) > 0) {
 
     # Check if we have any recommended pairs
