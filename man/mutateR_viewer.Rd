@@ -13,4 +13,6 @@ mutateR_viewer(plot_obj)
 \description{
 Launches a small Shiny gadget showing the interactive Plotly heatmap.
 Clicking a cell filters the gRNA table below.
+Includes a "Vendor Export" tool to generate IDT-ready order sheets
+for synthetic gRNAs and genotyping primers.
 }
