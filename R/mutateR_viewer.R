@@ -1,9 +1,7 @@
 #' Interactive viewer for mutateR gRNA design heatmaps
 #'
 #' Launches a small Shiny gadget showing the interactive Plotly heatmap.
-#' Clicking a cell filters the gRNA table below.
-#' Includes a "Vendor Export" tool to generate IDT-ready order sheets
-#' for synthetic gRNAs and genotyping primers.
+#' Clicking a cell filters the gRNA table below. Primer3-generated genotyping primers are displayed for each recommended gRNA pair.
 #'
 #' @param plot_obj Plotly object returned in the mutateR output list
 #'                 (element \code{$plot}); must have attribute \code{"pairs_data"}.
@@ -57,7 +55,7 @@ mutateR_viewer <- function(plot_obj) {
           shiny::selectInput("vendor_format", "Format:",
                              choices = c("IDT (Bulk Upload)", "Generic (Name, Seq)")),
 
-          shiny::helpText("Exports synthetic gRNAs (RNA) and genotyping primers (DNA)."),
+          shiny::helpText("Exports gRNA protospacer sequences and genotyping primers."),
           shiny::downloadButton("dl_vendor", "Download Order Sheet"),
 
           shiny::hr(),
@@ -137,19 +135,20 @@ mutateR_viewer <- function(plot_obj) {
         cols_to_show <- c("exon_5p", "exon_3p", "genomic_deletion_size",
                           "protospacer_sequence_5p", "ontarget_score_5p",
                           "protospacer_sequence_3p", "ontarget_score_3p",
-                          "recommended")
+                          "recommended") # For consideration: use the 'colvis' button option to allow users to select/deselect other columns from the $pairs dataframe
 
         # Add primer info if it exists
         if("primer_ext_fwd" %in% names(dat)) {
-          cols_to_show <- c(cols_to_show, "primer_ext_fwd", "primer_ext_rev")
+          cols_to_show <- c(cols_to_show, "primer_ext_fwd", "primer_ext_rev", "primer_int_fwd", "primer_int_rev")
         }
 
         DT::datatable(dat[, intersect(names(dat), cols_to_show), drop=FALSE],
                       extensions = c("Buttons", "Select"),
                       rownames = FALSE,
-                      selection = 'multiple', # Allow multiple row selection
+                      selection = 'multiple', # Allow multiple row selection. Works but shiny doesn't like DT's selection implementation - for consideration
                       options = list(
                         dom = 'Blfrtip',
+                        buttons = list('copy','csv'),
                         lengthMenu = list(c(5, 10, 25), c('5', '10', '25')),
                         scrollX = TRUE,
                         select = list(style = 'multi')
@@ -158,7 +157,7 @@ mutateR_viewer <- function(plot_obj) {
                           digits = 2)
       }, server = FALSE)
 
-      # --- Simple CSV Download ---
+      # --- CSV data download ---
       output$dl_csv <- shiny::downloadHandler(
         filename = function() { paste0("mutateR_data_", Sys.Date(), ".csv") },
         content = function(file) {
@@ -167,13 +166,13 @@ mutateR_viewer <- function(plot_obj) {
         }
       )
 
-      # --- Vendor Export Logic ---
+      # --- Vendor export logic ---
       output$dl_vendor <- shiny::downloadHandler(
         filename = function() {
           paste0("mutateR_IDT_Order_", Sys.Date(), ".csv")
         },
         content = function(file) {
-          # 1. Get data: Use rows SELECTED in the table. If none selected, use ALL in table.
+          # 1. Get data: Use rows SELECTED in the table. If none selected, use ALL in table. <- Consider later if this is the best course of action... after the backend filtering we've applied this shouldn't ever be more than an easily correctable nuisance for users who error (minimal crash/memory fuckery risk unlikely for a subset of a subset) BUT maybe explicitly declare default behaviour or switch to 'no rows selected' error and cognate behaviour.
           full_data <- heatmap_filtered_data()
           s <- input$pairs_tbl_rows_selected
 
@@ -185,23 +184,23 @@ mutateR_viewer <- function(plot_obj) {
 
           if (nrow(export_data) == 0) return(NULL)
 
-          # 2. Build Order List
+          # 2. Build order list (currently separates oligos and guides by flagging with a DNA/RNA tag, but this is not suitable for the vendor bulk upload and would need to go)
           order_rows <- list()
 
           for(i in seq_len(nrow(export_data))) {
             row <- export_data[i, ]
-            # Unique Identifier
+            # Append sequence name (mainly for primers - need to figure out an elegant way to handle crRNA seq export as this is distinct from ordering oligos). Also need to factor in common name length restrictions (i.e. make a standardised oligo nomenclature -- think on this)
             id_base <- paste0("Pair_", i, "_E", row$exon_5p, "-E", row$exon_3p)
 
-            # --- gRNA 5' (RNA) ---
+            # --- 5' gRNA (RNA) ---
             order_rows[[length(order_rows)+1]] <- data.frame(
               Name = paste0(id_base, "_gRNA_5p"),
               Sequence = row$protospacer_sequence_5p,
               Molecule = "RNA (crRNA)",
-              Scale = "2nm", Purification = "STD"
+              Scale = "2nm", Purification = "STD" # Note that we are automatically applying scale and purification method, which might be risky (don't want the user to accidentally order the wrong amount etc.). Should make this a user choice, but I don't want to make the interface too busy with dropdown boxes etc. etc.)
             )
 
-            # --- gRNA 3' (RNA) ---
+            # --- 3' gRNA (RNA) ---
             order_rows[[length(order_rows)+1]] <- data.frame(
               Name = paste0(id_base, "_gRNA_3p"),
               Sequence = row$protospacer_sequence_3p,
@@ -209,7 +208,7 @@ mutateR_viewer <- function(plot_obj) {
               Scale = "2nm", Purification = "STD"
             )
 
-            # --- External Primers (DNA) ---
+            # --- External Primers (DNA) -- needed for all gRNA pairs ---
             if ("primer_ext_fwd" %in% names(row) && !is.na(row$primer_ext_fwd)) {
               order_rows[[length(order_rows)+1]] <- data.frame(
                 Name = paste0(id_base, "_Prim_Ext_F"), Sequence = row$primer_ext_fwd,
@@ -221,7 +220,7 @@ mutateR_viewer <- function(plot_obj) {
               )
             }
 
-            # --- Internal Primers (DNA) - Strategy B ---
+            # --- Internal Primers (DNA) - Strategy B (only for very large deletions) ---
             if ("primer_int_fwd" %in% names(row) && !is.na(row$primer_int_fwd)) {
               order_rows[[length(order_rows)+1]] <- data.frame(
                 Name = paste0(id_base, "_Prim_Int_F"), Sequence = row$primer_int_fwd,
@@ -236,7 +235,7 @@ mutateR_viewer <- function(plot_obj) {
 
           final_df <- do.call(rbind, order_rows)
 
-          # 3. Write Output
+          # 3. Write output
           utils::write.csv(final_df, file, row.names = FALSE)
         }
       )

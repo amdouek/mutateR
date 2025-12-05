@@ -1,7 +1,7 @@
 mutateR
 ================
 Alon M Douek
-2025-11-29
+2025-12-06
 
 - [Overview](#overview)
   - [Background](#background)
@@ -10,17 +10,15 @@ Alon M Douek
 - [How does `mutateR` work?](#how-does-mutater-work)
 - [Getting started](#getting-started)
   - [Installation](#installation)
-- [Minimal `mutateR` workflow](#minimal-mutater-workflow)
+  - [Setting up the `mutateR` Python
+    backend](#setting-up-the-mutater-python-backend)
+- [The `mutateR` workflow](#the-mutater-workflow)
   - [Interpreting the `run_mutateR()`
     output](#interpreting-the-run_mutater-output)
+  - [A note on primer design](#a-note-on-primer-design)
   - [Special cases](#special-cases)
 - [Using the `mutateR_viewer`](#using-the-mutater_viewer)
 - [Manual function execution](#manual-function-execution)
-  - [`get_gene_info()`](#get_gene_info)
-  - [`get_exon_structures()`](#get_exon_structures)
-  - [`find_cas9_sites()`](#find_cas9_sites)
-  - [`find_cas12a_sites()`](#find_cas12a_sites)
-  - [`score_grnas()`](#score_grnas)
 - [To be implemented](#to-be-implemented)
 - [Session information](#session-information)
 - [References](#references)
@@ -96,11 +94,11 @@ mutations that we can generate.
 
 If we delete parts of a gene that correspond to functional domains of
 the encoded protein, but maintain the original reading frame (such that
-there is no PTC**\***), we are left with a stably-expressed, truncated
-mutant transcript that does not encode a functional protein but also
-does not induce transcriptional adaptation via NMD.
+there is no PTC), we are left with a stably-expressed, truncated mutant
+transcript that does not encode a functional protein but also does not
+induce transcriptional adaptation via NMD.
 
-> *\*Note*: There is nuance to NMD induction. For example, PTCs are much
+> *Note*: There is nuance to NMD induction. For example, PTCs are much
 > better tolerated (*i.e.*, do not induce NMD) if they occur in the
 > transcript’s terminal exon. For an excellent quantitative study of NMD
 > induction relative to transcript PTC position, please see [Lindeboom,
@@ -121,11 +119,27 @@ Cas effector PAMs (currently Cas9 NGG and Cas12a TTTV) associated with
 protospacers that do not cross exon boundaries. After calculating
 on-target scores for potential gRNAs using rule sets from `crisprScore`
 ([Hoberecht et al., *Nature Communications*
-(2022)](https://www.nature.com/articles/s41467-022-34320-7 "A comprehensive Bioconductor ecosystem for the design of CRISPR guide RNAs across nucleases and technologies")),
-`mutateR` returns recommended gRNA pairs to target exons where the
-flanking exons are in-frame with each other. It also produces a
-graphical representation of the selected transcript, its
+(2022)](https://www.nature.com/articles/s41467-022-34320-7 "A comprehensive Bioconductor ecosystem for the design of CRISPR guide RNAs across nucleases and technologies"))
+where possible, or by manuel re-implementation of methods not available
+from `crisprScore`, `mutateR` returns recommended gRNA pairs to target
+exons where the flanking exons are in-frame with each other. It also
+produces a graphical representation of the selected transcript, its
 phase-compatible exons, and the recommended exon pairs for targeting.
+
+> As of December 2025, `mutateR` utilises a Python backend (via
+> `reticulate`) to allow for implementation of python-dependent
+> functionalities. This was originally done to implement
+> deep-learning-based on-target scoring methods (dependent on TensorFlow
+> etc.) which could not be accessed by Windows OS users from
+> `crisprScore`, but now is also required for the primer design facet of
+> the `run_mutateR` pipeline (via `primer3-py`).
+>
+> As these core functionalities (and likely future ones) use the Python
+> backend, it is **highly recommended** that all `mutateR` users install
+> and activate the `r-mutater` Python env (containing all the requisite
+> modules) from within `mutateR`. See the relevant Installation section
+> (\[Setting up the mutateR Python backend\]) below for more
+> information.
 
 The `mutateR` package consists of the following ordered functions:
 
@@ -148,7 +162,9 @@ The `mutateR` package consists of the following ordered functions:
 `mutateR` also has an additional function, `design_gRNA_pairs()`, that
 is not included in the wrapper function. This function can be used in
 isolation to produce a data.frame of gRNA pairs for the gene of
-interest.
+interest. Other scripts such as `deep_learning_utils.R`, `python_env.R`,
+`primer3-backend.R` and `design_primers.R` contain helper functions that
+are critical but not directly user-executed pipeline components.
 
 ## Getting started
 
@@ -191,16 +207,75 @@ alongside `mutateR`.
 > You can also see all genomes currently available through `BSgenome` by
 > running `BSgenome::available.genomes()`.
 
+### Setting up the `mutateR` Python backend
+
+In order to use the full suite of functionalities in `mutateR` (e.g.,
+automated genotyping primer design, all gRNA on-target scoring methods),
+you must install and activate the package’s Conda environment. This env
+contains all the necessary dependencies for Python-reliant package
+functions.
+
+#### Install `reticulate`
+
+`reticulate` is the [R interface to
+Python](https://rstudio.github.io/reticulate/) required to run `mutateR`
+as intended. You can install it from CRAN if needed, but it is imported
+upon installation of `mutateR`.
+
+#### Install the `r-mutater` Python env
+
+Installing the Python backend is simple: In R, after installing and
+loading the `mutateR` package, simply run the command
+`install_mutater_env()`.
+
+> If you have never used Python before, it likely does not yet exist on
+> your device. If this is the case, and you are running `mutateR` for
+> the first time, this command will install
+> [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/main)
+> via `reticulate`. This might take a few minutes - ensure it completes
+> fully before proceeding.
+
+This command will create an env called `r-mutater` with the specified
+`python_version` containing the following dependencies:
+`"tensorflow-cpu", "numpy<2", "h5py", "pandas", "scipy", "primer3-py"`.
+
+If for whatever reason the env has not been installed correctly (or if a
+new dependency has been added), rerun the installation with the
+parameter `fresh = TRUE` to remove and reinstall the env.
+
+**Important:** Restart your R session (Ctrl/Cmd + Shift + F10) after
+installation is complete.
+
+#### Activate the env
+
+After **restarting your R session**, run `activate_mutater_env()` to
+point your R session to the `r-mutater` env. `reticulate`’s default env
+is `RETICULATE_PYTHON`; `activate_mutater_env()` will unset this and set
+it as `r-mutater`. This will only last for the current R session and
+will revert to the default upon session restart (i.e., you will need to
+reactivate the env each time you initiate a new session, but you will
+only need to *reinstall* the env if a new dependency is added or if it
+is corrupter).
+
+Once the env is successfully activated, `[1] TRUE` will be printed in
+the console. At this point, you will be able to make use of the full
+suite of `mutateR` functionalities.
+
+## The `mutateR` workflow
+
 In the below example run, we will run `mutateR` on human *TP53* to
 select optimal Cas9 gRNA pairs*.* Assuming you have installed both
-`mutateR` and your BSgenome of choice (in this case, human):
+`mutateR` and your BSgenome of choice (in this case, human), and set up
+the Python backend correctly:
 
 ``` r
+library(reticulate)
 library(mutateR)
 library(BSgenome.Hsapiens.UCSC.hg38)
-```
 
-## Minimal `mutateR` workflow
+activate_mutater_env()
+#> [1] TRUE
+```
 
 The wrapper function `run_mutateR()` executes the full pipeline (using
 the canonical transcript by default). For human *TP53:*
@@ -212,27 +287,34 @@ tp53_res <- run_mutateR(
   genome = BSgenome.Hsapiens.UCSC.hg38,
   nuclease = "Cas9",
   score_method = 'ruleset1',
+  design_primers = TRUE,
   quiet = FALSE,
   plot_mode = 'heat'
   )
 #> Retrieving gene/transcript information...
 #> Using transcript: ENST00000269305 for gene: TP53
 #> Locating Cas9 target sites...
-#> Scoring gRNAs using model: ruleset1
-#> Computing on‑target scores using ruleset1 model...
-#> Re‑orienting 214 guides so PAM = NGG at positions 26–27.
-#> PAM triplet distribution (positions 25–27):
+#> PAM distribution:
 #> 
 #> AGG CGG GGG TGG 
-#> 102  36 136 125
+#> 104  39 133 123
+#> Scoring gRNAs using model: ruleset1
+#> Computing on‑target scores using ruleset1 model...
 #> Scored 399 guides using ruleset1.
 #> Assembling valid gRNA pairs for TP53 ...
 #> Assembling gRNA pairs for exon‑flanking deletions...
+#> Detected probability-based scores (e.g. ruleset1). Using default cutoff: 0.5
 #> Retrieving InterPro domain annotations from Ensembl Genes mart...
-#> Generated 2664 candidate exon‑flanking gRNA pairs.
+#> Generated 2784 candidate exon‑flanking gRNA pairs.
+#> Designing genotyping primers for 35 recommended pairs...
+#> Preparing primer design batch requests...
+#>   |                                                                              |                                                                      |   0%  |                                                                              |==                                                                    |   3%  |                                                                              |====                                                                  |   6%  |                                                                              |======                                                                |   9%  |                                                                              |========                                                              |  11%  |                                                                              |==========                                                            |  14%  |                                                                              |============                                                          |  17%  |                                                                              |==============                                                        |  20%  |                                                                              |================                                                      |  23%  |                                                                              |==================                                                    |  26%  |                                                                              |====================                                                  |  29%  |                                                                              |======================                                                |  31%  |                                                                              |========================                                              |  34%  |                                                                              |==========================                                            |  37%  |                                                                              |============================                                          |  40%  |                                                                              |==============================                                        |  43%  |                                                                              |================================                                      |  46%  |                                                                              |==================================                                    |  49%  |                                                                              |====================================                                  |  51%  |                                                                              |======================================                                |  54%  |                                                                              |========================================                              |  57%  |                                                                              |==========================================                            |  60%  |                                                                              |============================================                          |  63%  |                                                                              |==============================================                        |  66%  |                                                                              |================================================                      |  69%  |                                                                              |==================================================                    |  71%  |                                                                              |====================================================                  |  74%  |                                                                              |======================================================                |  77%  |                                                                              |========================================================              |  80%  |                                                                              |==========================================================            |  83%  |                                                                              |============================================================          |  86%  |                                                                              |==============================================================        |  89%  |                                                                              |================================================================      |  91%  |                                                                              |==================================================================    |  94%  |                                                                              |====================================================================  |  97%  |                                                                              |======================================================================| 100%
+#> Running Batch Primer3 (35 designs)...
+#> Mapping results to dataframe...
+#> Designed primers for 35/35 pairs.
 #> Plotting exon phase compatibility and gRNA pairs...
 #> Retrieving Pfam domain annotations from Ensembl Genes mart...
-#> mutateR pipeline completed for TP53, finding 2664 gRNA pairs.
+#> mutateR pipeline completed for TP53, finding 2784 gRNA pairs.
 ```
 
 > Note that this function also reports a PAM distribution. In the case
@@ -266,54 +348,19 @@ kableExtra::scroll_box(knitr::kable(head(tp53_res$pairs,5)),width = '700px')
 
 <tr>
 
-<th style="text-align:right;">
-
-upstream_pair
-</th>
-
-<th style="text-align:right;">
-
-downstream_pair
-</th>
-
-<th style="text-align:right;">
-
-exon_5p
-</th>
-
-<th style="text-align:right;">
-
-exon_3p
-</th>
-
 <th style="text-align:left;">
 
-compatible
-</th>
-
-<th style="text-align:left;">
-
-frameshift
-</th>
-
-<th style="text-align:left;">
-
-ptc_flag
-</th>
-
-<th style="text-align:left;">
-
-terminal_exon_case
+seqnames_5p
 </th>
 
 <th style="text-align:right;">
 
-genomic_deletion_size
+start_5p
 </th>
 
 <th style="text-align:right;">
 
-transcript_deletion_size
+end_5p
 </th>
 
 <th style="text-align:left;">
@@ -328,7 +375,27 @@ pam_sequence_5p
 
 <th style="text-align:right;">
 
+cut_site_5p
+</th>
+
+<th style="text-align:right;">
+
 ontarget_score_5p
+</th>
+
+<th style="text-align:left;">
+
+seqnames_3p
+</th>
+
+<th style="text-align:right;">
+
+start_3p
+</th>
+
+<th style="text-align:right;">
+
+end_3p
 </th>
 
 <th style="text-align:left;">
@@ -343,522 +410,13 @@ pam_sequence_3p
 
 <th style="text-align:right;">
 
+cut_site_3p
+</th>
+
+<th style="text-align:right;">
+
 ontarget_score_3p
 </th>
-
-<th style="text-align:left;">
-
-domains
-</th>
-
-<th style="text-align:left;">
-
-recommended
-</th>
-
-</tr>
-
-</thead>
-
-<tbody>
-
-<tr>
-
-<td style="text-align:right;">
-
-3
-</td>
-
-<td style="text-align:right;">
-
-7
-</td>
-
-<td style="text-align:right;">
-
-4
-</td>
-
-<td style="text-align:right;">
-
-6
-</td>
-
-<td style="text-align:left;">
-
-TRUE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:right;">
-
-1148
-</td>
-
-<td style="text-align:right;">
-
-576
-</td>
-
-<td style="text-align:left;">
-
-GGATGATTTGATGCTGTCCC
-</td>
-
-<td style="text-align:left;">
-
-CGG
-</td>
-
-<td style="text-align:right;">
-
-0.3658742
-</td>
-
-<td style="text-align:left;">
-
-TCCTCAGCATCTTATCCGAG
-</td>
-
-<td style="text-align:left;">
-
-TGG
-</td>
-
-<td style="text-align:right;">
-
-0.7988059
-</td>
-
-<td style="text-align:left;">
-
-p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
-p53/RUNT-type_TF_DNA-bd_sf
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-3
-</td>
-
-<td style="text-align:right;">
-
-7
-</td>
-
-<td style="text-align:right;">
-
-4
-</td>
-
-<td style="text-align:right;">
-
-6
-</td>
-
-<td style="text-align:left;">
-
-TRUE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:right;">
-
-1165
-</td>
-
-<td style="text-align:right;">
-
-576
-</td>
-
-<td style="text-align:left;">
-
-CCCCGGACGATATTGAACAA
-</td>
-
-<td style="text-align:left;">
-
-TGG
-</td>
-
-<td style="text-align:right;">
-
-0.6092504
-</td>
-
-<td style="text-align:left;">
-
-TCCTCAGCATCTTATCCGAG
-</td>
-
-<td style="text-align:left;">
-
-TGG
-</td>
-
-<td style="text-align:right;">
-
-0.7988059
-</td>
-
-<td style="text-align:left;">
-
-p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
-p53/RUNT-type_TF_DNA-bd_sf
-</td>
-
-<td style="text-align:left;">
-
-TRUE
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-3
-</td>
-
-<td style="text-align:right;">
-
-7
-</td>
-
-<td style="text-align:right;">
-
-4
-</td>
-
-<td style="text-align:right;">
-
-6
-</td>
-
-<td style="text-align:left;">
-
-TRUE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:right;">
-
-1182
-</td>
-
-<td style="text-align:right;">
-
-576
-</td>
-
-<td style="text-align:left;">
-
-CAATGGTTCACTGAAGACCC
-</td>
-
-<td style="text-align:left;">
-
-AGG
-</td>
-
-<td style="text-align:right;">
-
-0.1820361
-</td>
-
-<td style="text-align:left;">
-
-TCCTCAGCATCTTATCCGAG
-</td>
-
-<td style="text-align:left;">
-
-TGG
-</td>
-
-<td style="text-align:right;">
-
-0.7988059
-</td>
-
-<td style="text-align:left;">
-
-p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
-p53/RUNT-type_TF_DNA-bd_sf
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-3
-</td>
-
-<td style="text-align:right;">
-
-7
-</td>
-
-<td style="text-align:right;">
-
-4
-</td>
-
-<td style="text-align:right;">
-
-6
-</td>
-
-<td style="text-align:left;">
-
-TRUE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:right;">
-
-1211
-</td>
-
-<td style="text-align:right;">
-
-576
-</td>
-
-<td style="text-align:left;">
-
-TGAAGCTCCCAGAATGCCAG
-</td>
-
-<td style="text-align:left;">
-
-AGG
-</td>
-
-<td style="text-align:right;">
-
-0.6824355
-</td>
-
-<td style="text-align:left;">
-
-TCCTCAGCATCTTATCCGAG
-</td>
-
-<td style="text-align:left;">
-
-TGG
-</td>
-
-<td style="text-align:right;">
-
-0.7988059
-</td>
-
-<td style="text-align:left;">
-
-p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
-p53/RUNT-type_TF_DNA-bd_sf
-</td>
-
-<td style="text-align:left;">
-
-TRUE
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:right;">
-
-3
-</td>
-
-<td style="text-align:right;">
-
-7
-</td>
-
-<td style="text-align:right;">
-
-4
-</td>
-
-<td style="text-align:right;">
-
-6
-</td>
-
-<td style="text-align:left;">
-
-TRUE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-<td style="text-align:right;">
-
-1226
-</td>
-
-<td style="text-align:right;">
-
-576
-</td>
-
-<td style="text-align:left;">
-
-GCCAGAGGCTGCTCCCCCCG
-</td>
-
-<td style="text-align:left;">
-
-TGG
-</td>
-
-<td style="text-align:right;">
-
-0.3874830
-</td>
-
-<td style="text-align:left;">
-
-TCCTCAGCATCTTATCCGAG
-</td>
-
-<td style="text-align:left;">
-
-TGG
-</td>
-
-<td style="text-align:right;">
-
-0.7988059
-</td>
-
-<td style="text-align:left;">
-
-p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
-p53/RUNT-type_TF_DNA-bd_sf
-</td>
-
-<td style="text-align:left;">
-
-FALSE
-</td>
-
-</tr>
-
-</tbody>
-
-</table>
-
-</div>
-
-By default, all pairs are present in this data.frame; if you are
-interested in only those that `mutateR` recommends, simply filter for
-`recommended == TRUE`.
-
-``` r
-tp53_recommended <- filter(tp53_res$pairs, tp53_res$pairs$recommended == TRUE)
-kableExtra::scroll_box(knitr::kable(head(tp53_recommended,5)),width = '700px')
-```
-
-<div style="border: 1px solid #ddd; padding: 5px; overflow-x: scroll; width:700px; ">
-
-<table>
-
-<thead>
-
-<tr>
 
 <th style="text-align:right;">
 
@@ -912,42 +470,52 @@ transcript_deletion_size
 
 <th style="text-align:left;">
 
-protospacer_sequence_5p
-</th>
-
-<th style="text-align:left;">
-
-pam_sequence_5p
-</th>
-
-<th style="text-align:right;">
-
-ontarget_score_5p
-</th>
-
-<th style="text-align:left;">
-
-protospacer_sequence_3p
-</th>
-
-<th style="text-align:left;">
-
-pam_sequence_3p
-</th>
-
-<th style="text-align:right;">
-
-ontarget_score_3p
-</th>
-
-<th style="text-align:left;">
-
 domains
 </th>
 
 <th style="text-align:left;">
 
 recommended
+</th>
+
+<th style="text-align:left;">
+
+priming_strategy
+</th>
+
+<th style="text-align:left;">
+
+primer_ext_fwd
+</th>
+
+<th style="text-align:left;">
+
+primer_ext_rev
+</th>
+
+<th style="text-align:left;">
+
+primer_int_fwd
+</th>
+
+<th style="text-align:left;">
+
+primer_int_rev
+</th>
+
+<th style="text-align:left;">
+
+exp_wt_size
+</th>
+
+<th style="text-align:right;">
+
+exp_mut_size
+</th>
+
+<th style="text-align:right;">
+
+exp_int_size
 </th>
 
 </tr>
@@ -957,6 +525,76 @@ recommended
 <tbody>
 
 <tr>
+
+<td style="text-align:left;">
+
+chr17
+</td>
+
+<td style="text-align:right;">
+
+7676034
+</td>
+
+<td style="text-align:right;">
+
+7676056
+</td>
+
+<td style="text-align:left;">
+
+CCCCGGACGATATTGAACAA
+</td>
+
+<td style="text-align:left;">
+
+TGG
+</td>
+
+<td style="text-align:right;">
+
+7676051
+</td>
+
+<td style="text-align:right;">
+
+0.6092504
+</td>
+
+<td style="text-align:left;">
+
+chr17
+</td>
+
+<td style="text-align:right;">
+
+7674869
+</td>
+
+<td style="text-align:right;">
+
+7674891
+</td>
+
+<td style="text-align:left;">
+
+TCCTCAGCATCTTATCCGAG
+</td>
+
+<td style="text-align:left;">
+
+TGG
+</td>
+
+<td style="text-align:right;">
+
+7674886
+</td>
+
+<td style="text-align:right;">
+
+0.7988059
+</td>
 
 <td style="text-align:right;">
 
@@ -1010,17 +648,107 @@ FALSE
 
 <td style="text-align:left;">
 
-CCCCGGACGATATTGAACAA
+p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
+p53/RUNT-type_TF_DNA-bd_sf
 </td>
 
 <td style="text-align:left;">
 
-TGG
+TRUE
+</td>
+
+<td style="text-align:left;">
+
+Flanking
+</td>
+
+<td style="text-align:left;">
+
+TAAGCAGCAGGAGAAAGCCC
+</td>
+
+<td style="text-align:left;">
+
+TGAAGCTCCCAGAATGCCAG
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+1424
 </td>
 
 <td style="text-align:right;">
 
-0.6092504
+259
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+chr17
+</td>
+
+<td style="text-align:right;">
+
+7676080
+</td>
+
+<td style="text-align:right;">
+
+7676102
+</td>
+
+<td style="text-align:left;">
+
+TGAAGCTCCCAGAATGCCAG
+</td>
+
+<td style="text-align:left;">
+
+AGG
+</td>
+
+<td style="text-align:right;">
+
+7676097
+</td>
+
+<td style="text-align:right;">
+
+0.6824355
+</td>
+
+<td style="text-align:left;">
+
+chr17
+</td>
+
+<td style="text-align:right;">
+
+7674869
+</td>
+
+<td style="text-align:right;">
+
+7674891
 </td>
 
 <td style="text-align:left;">
@@ -1035,23 +763,13 @@ TGG
 
 <td style="text-align:right;">
 
+7674886
+</td>
+
+<td style="text-align:right;">
+
 0.7988059
 </td>
-
-<td style="text-align:left;">
-
-p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
-p53/RUNT-type_TF_DNA-bd_sf
-</td>
-
-<td style="text-align:left;">
-
-TRUE
-</td>
-
-</tr>
-
-<tr>
 
 <td style="text-align:right;">
 
@@ -1105,17 +823,107 @@ FALSE
 
 <td style="text-align:left;">
 
+p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
+p53/RUNT-type_TF_DNA-bd_sf
+</td>
+
+<td style="text-align:left;">
+
+TRUE
+</td>
+
+<td style="text-align:left;">
+
+Flanking
+</td>
+
+<td style="text-align:left;">
+
+TAAGCAGCAGGAGAAAGCCC
+</td>
+
+<td style="text-align:left;">
+
 TGAAGCTCCCAGAATGCCAG
 </td>
 
 <td style="text-align:left;">
 
-AGG
+NA
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+1424
 </td>
 
 <td style="text-align:right;">
 
-0.6824355
+213
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+chr17
+</td>
+
+<td style="text-align:right;">
+
+7676189
+</td>
+
+<td style="text-align:right;">
+
+7676211
+</td>
+
+<td style="text-align:left;">
+
+CCTTCCCAGAAAACCTACCA
+</td>
+
+<td style="text-align:left;">
+
+GGG
+</td>
+
+<td style="text-align:right;">
+
+7676206
+</td>
+
+<td style="text-align:right;">
+
+0.5585539
+</td>
+
+<td style="text-align:left;">
+
+chr17
+</td>
+
+<td style="text-align:right;">
+
+7674869
+</td>
+
+<td style="text-align:right;">
+
+7674891
 </td>
 
 <td style="text-align:left;">
@@ -1130,23 +938,13 @@ TGG
 
 <td style="text-align:right;">
 
+7674886
+</td>
+
+<td style="text-align:right;">
+
 0.7988059
 </td>
-
-<td style="text-align:left;">
-
-p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
-p53/RUNT-type_TF_DNA-bd_sf
-</td>
-
-<td style="text-align:left;">
-
-TRUE
-</td>
-
-</tr>
-
-<tr>
 
 <td style="text-align:right;">
 
@@ -1200,17 +998,107 @@ FALSE
 
 <td style="text-align:left;">
 
-CCTTCCCAGAAAACCTACCA
+p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
+p53/RUNT-type_TF_DNA-bd_sf
 </td>
 
 <td style="text-align:left;">
 
-GGG
+TRUE
+</td>
+
+<td style="text-align:left;">
+
+Flanking
+</td>
+
+<td style="text-align:left;">
+
+TAAGCAGCAGGAGAAAGCCC
+</td>
+
+<td style="text-align:left;">
+
+TGCTGGATCCCCACTTTTCC
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+1888
 </td>
 
 <td style="text-align:right;">
 
-0.5585539
+568
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+chr17
+</td>
+
+<td style="text-align:right;">
+
+7676204
+</td>
+
+<td style="text-align:right;">
+
+7676226
+</td>
+
+<td style="text-align:left;">
+
+CAGAATGCAAGAAGCCCAGA
+</td>
+
+<td style="text-align:left;">
+
+CGG
+</td>
+
+<td style="text-align:right;">
+
+7676221
+</td>
+
+<td style="text-align:right;">
+
+0.6499000
+</td>
+
+<td style="text-align:left;">
+
+chr17
+</td>
+
+<td style="text-align:right;">
+
+7674869
+</td>
+
+<td style="text-align:right;">
+
+7674891
 </td>
 
 <td style="text-align:left;">
@@ -1225,23 +1113,13 @@ TGG
 
 <td style="text-align:right;">
 
+7674886
+</td>
+
+<td style="text-align:right;">
+
 0.7988059
 </td>
-
-<td style="text-align:left;">
-
-p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
-p53/RUNT-type_TF_DNA-bd_sf
-</td>
-
-<td style="text-align:left;">
-
-TRUE
-</td>
-
-</tr>
-
-<tr>
 
 <td style="text-align:right;">
 
@@ -1285,7 +1163,7 @@ FALSE
 
 <td style="text-align:right;">
 
-1299
+1335
 </td>
 
 <td style="text-align:right;">
@@ -1295,7 +1173,77 @@ FALSE
 
 <td style="text-align:left;">
 
-CCTGGTAGGTTTTCTGGGAA
+p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
+p53/RUNT-type_TF_DNA-bd_sf
+</td>
+
+<td style="text-align:left;">
+
+TRUE
+</td>
+
+<td style="text-align:left;">
+
+Flanking
+</td>
+
+<td style="text-align:left;">
+
+TAAGCAGCAGGAGAAAGCCC
+</td>
+
+<td style="text-align:left;">
+
+TGCTGGATCCCCACTTTTCC
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+1888
+</td>
+
+<td style="text-align:right;">
+
+553
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+chr17
+</td>
+
+<td style="text-align:right;">
+
+7676151
+</td>
+
+<td style="text-align:right;">
+
+7676173
+</td>
+
+<td style="text-align:left;">
+
+GAAGGGACAGAAGATGACAG
 </td>
 
 <td style="text-align:left;">
@@ -1305,7 +1253,27 @@ GGG
 
 <td style="text-align:right;">
 
-0.5585539
+7676168
+</td>
+
+<td style="text-align:right;">
+
+0.7889533
+</td>
+
+<td style="text-align:left;">
+
+chr17
+</td>
+
+<td style="text-align:right;">
+
+7674869
+</td>
+
+<td style="text-align:right;">
+
+7674891
 </td>
 
 <td style="text-align:left;">
@@ -1320,23 +1288,13 @@ TGG
 
 <td style="text-align:right;">
 
+7674886
+</td>
+
+<td style="text-align:right;">
+
 0.7988059
 </td>
-
-<td style="text-align:left;">
-
-p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
-p53/RUNT-type_TF_DNA-bd_sf
-</td>
-
-<td style="text-align:left;">
-
-TRUE
-</td>
-
-</tr>
-
-<tr>
 
 <td style="text-align:right;">
 
@@ -1390,17 +1348,306 @@ FALSE
 
 <td style="text-align:left;">
 
-GAAGGGACAGAAGATGACAG
+p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
+p53/RUNT-type_TF_DNA-bd_sf
 </td>
 
 <td style="text-align:left;">
 
-GGG
+TRUE
+</td>
+
+<td style="text-align:left;">
+
+Flanking
+</td>
+
+<td style="text-align:left;">
+
+TAAGCAGCAGGAGAAAGCCC
+</td>
+
+<td style="text-align:left;">
+
+TGCTGGATCCCCACTTTTCC
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+1888
 </td>
 
 <td style="text-align:right;">
 
-0.7889533
+606
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+</tr>
+
+</tbody>
+
+</table>
+
+</div>
+
+By default, all pairs are present in this data.frame; if you are
+interested in only those that `mutateR` recommends, simply filter for
+`recommended == TRUE`.
+
+``` r
+tp53_recommended <- filter(tp53_res$pairs, tp53_res$pairs$recommended == TRUE)
+kableExtra::scroll_box(knitr::kable(head(tp53_recommended,5)),width = '700px')
+```
+
+<div style="border: 1px solid #ddd; padding: 5px; overflow-x: scroll; width:700px; ">
+
+<table>
+
+<thead>
+
+<tr>
+
+<th style="text-align:left;">
+
+seqnames_5p
+</th>
+
+<th style="text-align:right;">
+
+start_5p
+</th>
+
+<th style="text-align:right;">
+
+end_5p
+</th>
+
+<th style="text-align:left;">
+
+protospacer_sequence_5p
+</th>
+
+<th style="text-align:left;">
+
+pam_sequence_5p
+</th>
+
+<th style="text-align:right;">
+
+cut_site_5p
+</th>
+
+<th style="text-align:right;">
+
+ontarget_score_5p
+</th>
+
+<th style="text-align:left;">
+
+seqnames_3p
+</th>
+
+<th style="text-align:right;">
+
+start_3p
+</th>
+
+<th style="text-align:right;">
+
+end_3p
+</th>
+
+<th style="text-align:left;">
+
+protospacer_sequence_3p
+</th>
+
+<th style="text-align:left;">
+
+pam_sequence_3p
+</th>
+
+<th style="text-align:right;">
+
+cut_site_3p
+</th>
+
+<th style="text-align:right;">
+
+ontarget_score_3p
+</th>
+
+<th style="text-align:right;">
+
+upstream_pair
+</th>
+
+<th style="text-align:right;">
+
+downstream_pair
+</th>
+
+<th style="text-align:right;">
+
+exon_5p
+</th>
+
+<th style="text-align:right;">
+
+exon_3p
+</th>
+
+<th style="text-align:left;">
+
+compatible
+</th>
+
+<th style="text-align:left;">
+
+frameshift
+</th>
+
+<th style="text-align:left;">
+
+ptc_flag
+</th>
+
+<th style="text-align:left;">
+
+terminal_exon_case
+</th>
+
+<th style="text-align:right;">
+
+genomic_deletion_size
+</th>
+
+<th style="text-align:right;">
+
+transcript_deletion_size
+</th>
+
+<th style="text-align:left;">
+
+domains
+</th>
+
+<th style="text-align:left;">
+
+recommended
+</th>
+
+<th style="text-align:left;">
+
+priming_strategy
+</th>
+
+<th style="text-align:left;">
+
+primer_ext_fwd
+</th>
+
+<th style="text-align:left;">
+
+primer_ext_rev
+</th>
+
+<th style="text-align:left;">
+
+primer_int_fwd
+</th>
+
+<th style="text-align:left;">
+
+primer_int_rev
+</th>
+
+<th style="text-align:left;">
+
+exp_wt_size
+</th>
+
+<th style="text-align:right;">
+
+exp_mut_size
+</th>
+
+<th style="text-align:right;">
+
+exp_int_size
+</th>
+
+</tr>
+
+</thead>
+
+<tbody>
+
+<tr>
+
+<td style="text-align:left;">
+
+chr17
+</td>
+
+<td style="text-align:right;">
+
+7676034
+</td>
+
+<td style="text-align:right;">
+
+7676056
+</td>
+
+<td style="text-align:left;">
+
+CCCCGGACGATATTGAACAA
+</td>
+
+<td style="text-align:left;">
+
+TGG
+</td>
+
+<td style="text-align:right;">
+
+7676051
+</td>
+
+<td style="text-align:right;">
+
+0.6092504
+</td>
+
+<td style="text-align:left;">
+
+chr17
+</td>
+
+<td style="text-align:right;">
+
+7674869
+</td>
+
+<td style="text-align:right;">
+
+7674891
 </td>
 
 <td style="text-align:left;">
@@ -1415,7 +1662,62 @@ TGG
 
 <td style="text-align:right;">
 
+7674886
+</td>
+
+<td style="text-align:right;">
+
 0.7988059
+</td>
+
+<td style="text-align:right;">
+
+3
+</td>
+
+<td style="text-align:right;">
+
+7
+</td>
+
+<td style="text-align:right;">
+
+4
+</td>
+
+<td style="text-align:right;">
+
+6
+</td>
+
+<td style="text-align:left;">
+
+TRUE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:right;">
+
+1165
+</td>
+
+<td style="text-align:right;">
+
+576
 </td>
 
 <td style="text-align:left;">
@@ -1429,6 +1731,746 @@ p53/RUNT-type_TF_DNA-bd_sf
 TRUE
 </td>
 
+<td style="text-align:left;">
+
+Flanking
+</td>
+
+<td style="text-align:left;">
+
+TAAGCAGCAGGAGAAAGCCC
+</td>
+
+<td style="text-align:left;">
+
+TGAAGCTCCCAGAATGCCAG
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+1424
+</td>
+
+<td style="text-align:right;">
+
+259
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+chr17
+</td>
+
+<td style="text-align:right;">
+
+7676080
+</td>
+
+<td style="text-align:right;">
+
+7676102
+</td>
+
+<td style="text-align:left;">
+
+TGAAGCTCCCAGAATGCCAG
+</td>
+
+<td style="text-align:left;">
+
+AGG
+</td>
+
+<td style="text-align:right;">
+
+7676097
+</td>
+
+<td style="text-align:right;">
+
+0.6824355
+</td>
+
+<td style="text-align:left;">
+
+chr17
+</td>
+
+<td style="text-align:right;">
+
+7674869
+</td>
+
+<td style="text-align:right;">
+
+7674891
+</td>
+
+<td style="text-align:left;">
+
+TCCTCAGCATCTTATCCGAG
+</td>
+
+<td style="text-align:left;">
+
+TGG
+</td>
+
+<td style="text-align:right;">
+
+7674886
+</td>
+
+<td style="text-align:right;">
+
+0.7988059
+</td>
+
+<td style="text-align:right;">
+
+3
+</td>
+
+<td style="text-align:right;">
+
+7
+</td>
+
+<td style="text-align:right;">
+
+4
+</td>
+
+<td style="text-align:right;">
+
+6
+</td>
+
+<td style="text-align:left;">
+
+TRUE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:right;">
+
+1211
+</td>
+
+<td style="text-align:right;">
+
+576
+</td>
+
+<td style="text-align:left;">
+
+p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
+p53/RUNT-type_TF_DNA-bd_sf
+</td>
+
+<td style="text-align:left;">
+
+TRUE
+</td>
+
+<td style="text-align:left;">
+
+Flanking
+</td>
+
+<td style="text-align:left;">
+
+TAAGCAGCAGGAGAAAGCCC
+</td>
+
+<td style="text-align:left;">
+
+TGAAGCTCCCAGAATGCCAG
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+1424
+</td>
+
+<td style="text-align:right;">
+
+213
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+chr17
+</td>
+
+<td style="text-align:right;">
+
+7676189
+</td>
+
+<td style="text-align:right;">
+
+7676211
+</td>
+
+<td style="text-align:left;">
+
+CCTTCCCAGAAAACCTACCA
+</td>
+
+<td style="text-align:left;">
+
+GGG
+</td>
+
+<td style="text-align:right;">
+
+7676206
+</td>
+
+<td style="text-align:right;">
+
+0.5585539
+</td>
+
+<td style="text-align:left;">
+
+chr17
+</td>
+
+<td style="text-align:right;">
+
+7674869
+</td>
+
+<td style="text-align:right;">
+
+7674891
+</td>
+
+<td style="text-align:left;">
+
+TCCTCAGCATCTTATCCGAG
+</td>
+
+<td style="text-align:left;">
+
+TGG
+</td>
+
+<td style="text-align:right;">
+
+7674886
+</td>
+
+<td style="text-align:right;">
+
+0.7988059
+</td>
+
+<td style="text-align:right;">
+
+3
+</td>
+
+<td style="text-align:right;">
+
+7
+</td>
+
+<td style="text-align:right;">
+
+4
+</td>
+
+<td style="text-align:right;">
+
+6
+</td>
+
+<td style="text-align:left;">
+
+TRUE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:right;">
+
+1320
+</td>
+
+<td style="text-align:right;">
+
+576
+</td>
+
+<td style="text-align:left;">
+
+p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
+p53/RUNT-type_TF_DNA-bd_sf
+</td>
+
+<td style="text-align:left;">
+
+TRUE
+</td>
+
+<td style="text-align:left;">
+
+Flanking
+</td>
+
+<td style="text-align:left;">
+
+TAAGCAGCAGGAGAAAGCCC
+</td>
+
+<td style="text-align:left;">
+
+TGCTGGATCCCCACTTTTCC
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+1888
+</td>
+
+<td style="text-align:right;">
+
+568
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+chr17
+</td>
+
+<td style="text-align:right;">
+
+7676204
+</td>
+
+<td style="text-align:right;">
+
+7676226
+</td>
+
+<td style="text-align:left;">
+
+CAGAATGCAAGAAGCCCAGA
+</td>
+
+<td style="text-align:left;">
+
+CGG
+</td>
+
+<td style="text-align:right;">
+
+7676221
+</td>
+
+<td style="text-align:right;">
+
+0.6499000
+</td>
+
+<td style="text-align:left;">
+
+chr17
+</td>
+
+<td style="text-align:right;">
+
+7674869
+</td>
+
+<td style="text-align:right;">
+
+7674891
+</td>
+
+<td style="text-align:left;">
+
+TCCTCAGCATCTTATCCGAG
+</td>
+
+<td style="text-align:left;">
+
+TGG
+</td>
+
+<td style="text-align:right;">
+
+7674886
+</td>
+
+<td style="text-align:right;">
+
+0.7988059
+</td>
+
+<td style="text-align:right;">
+
+3
+</td>
+
+<td style="text-align:right;">
+
+7
+</td>
+
+<td style="text-align:right;">
+
+4
+</td>
+
+<td style="text-align:right;">
+
+6
+</td>
+
+<td style="text-align:left;">
+
+TRUE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:right;">
+
+1335
+</td>
+
+<td style="text-align:right;">
+
+576
+</td>
+
+<td style="text-align:left;">
+
+p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
+p53/RUNT-type_TF_DNA-bd_sf
+</td>
+
+<td style="text-align:left;">
+
+TRUE
+</td>
+
+<td style="text-align:left;">
+
+Flanking
+</td>
+
+<td style="text-align:left;">
+
+TAAGCAGCAGGAGAAAGCCC
+</td>
+
+<td style="text-align:left;">
+
+TGCTGGATCCCCACTTTTCC
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+1888
+</td>
+
+<td style="text-align:right;">
+
+553
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+chr17
+</td>
+
+<td style="text-align:right;">
+
+7676151
+</td>
+
+<td style="text-align:right;">
+
+7676173
+</td>
+
+<td style="text-align:left;">
+
+GAAGGGACAGAAGATGACAG
+</td>
+
+<td style="text-align:left;">
+
+GGG
+</td>
+
+<td style="text-align:right;">
+
+7676168
+</td>
+
+<td style="text-align:right;">
+
+0.7889533
+</td>
+
+<td style="text-align:left;">
+
+chr17
+</td>
+
+<td style="text-align:right;">
+
+7674869
+</td>
+
+<td style="text-align:right;">
+
+7674891
+</td>
+
+<td style="text-align:left;">
+
+TCCTCAGCATCTTATCCGAG
+</td>
+
+<td style="text-align:left;">
+
+TGG
+</td>
+
+<td style="text-align:right;">
+
+7674886
+</td>
+
+<td style="text-align:right;">
+
+0.7988059
+</td>
+
+<td style="text-align:right;">
+
+3
+</td>
+
+<td style="text-align:right;">
+
+7
+</td>
+
+<td style="text-align:right;">
+
+4
+</td>
+
+<td style="text-align:right;">
+
+6
+</td>
+
+<td style="text-align:left;">
+
+TRUE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:left;">
+
+FALSE
+</td>
+
+<td style="text-align:right;">
+
+1282
+</td>
+
+<td style="text-align:right;">
+
+576
+</td>
+
+<td style="text-align:left;">
+
+p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
+p53/RUNT-type_TF_DNA-bd_sf
+</td>
+
+<td style="text-align:left;">
+
+TRUE
+</td>
+
+<td style="text-align:left;">
+
+Flanking
+</td>
+
+<td style="text-align:left;">
+
+TAAGCAGCAGGAGAAAGCCC
+</td>
+
+<td style="text-align:left;">
+
+TGCTGGATCCCCACTTTTCC
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+1888
+</td>
+
+<td style="text-align:right;">
+
+606
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
 </tr>
 
 </tbody>
@@ -1439,44 +2481,83 @@ TRUE
 
 ### Interpreting the `run_mutateR()` output
 
-##### The `pairs` data.frame:
+##### The `pairs` data.frame
+
+`$pairs` contains several columns - some of these are not strictly
+useful for the end-user (e.g. genomic coordinates), but most represent
+the primary output of the pipeline. The below sections will elaborate on
+these:
+
+###### Flanking and targeted exons
 
 `upstream_exon` and `downstream_exon` refer to the two phase-compatible
 exons, while `exon_5p` and `exon_3p` refer to the 5-prime and 3-prime
 exons to simultaneously target using the selected gRNAs in that row of
 the data.frame.
 
-The `compatible` flag (`run_mutateR()` currently only returns compatible
-exon pairs) highlights if the exon pair is phase-compatible; if a
-non-compatible exon pair were used, one might expect the `frameshift`
-and `ptc_flag` values to be `TRUE`. The `terminal_exon_case` flag is
-used for a special case, where a frameshift has introduced a PTC into
-the terminal exon of the selected transcript. Final-exon PTCs induce NMD
-with far lower efficiency than those in non-terminal exons, and are
-significantly less likely to result in transcriptional compensatory
-behaviour.
+###### Pair classification flags
+
+Each gRNA pair is annotated by several classifications. The `compatible`
+flag (`run_mutateR()` currently only returns compatible exon pairs)
+highlights if the exon pair is phase-compatible; if a non-compatible
+exon pair were used, one might expect the `frameshift` and `ptc_flag`
+values to be `TRUE`. The `terminal_exon_case` flag is used for a special
+case, where a frameshift has introduced a PTC into the terminal exon of
+the selected transcript. Final-exon PTCs induce NMD with far lower
+efficiency than those in non-terminal exons, and are significantly less
+likely to result in transcriptional compensatory behaviour.
+
+###### gRNA pairs and associated deletion sizes
 
 The actual gRNA protospacer sequences are given in
 `protospacer_sequence_5p` and `protospacer_sequence_3p` (with 5p and 3p
-referring to the relative position in the transcript), and the
-corresponding PAMs in `pam_sequence_5p` and `pam_sequence_3p`
-respectively.
+referring to the relative position in the transcript of the gRNAs in the
+given pair), and the corresponding PAMs in `pam_sequence_5p` and
+`pam_sequence_3p` respectively.
 
 > Note that while both + and - strands are scanned for PAMs, the -
 > strand sequences are automatically reverse-complemented so will always
 > display NGG PAMs (instead of CCN).
 
+For each gRNA pair, the expected deletion size at both the genomic and
+transcript level is reported in `genomic_deletion_size` and
+`transcript_deletion_size`, respectively.
+
+###### Genotyping primers and amplicon sizes
+
+`run_mutateR()` now also automatically generates a pair (or two,
+depending on the nature of the deletion - see [A note on primer
+design](#a-note-on-primer-design) below) of primers for genotyping the
+resulting deletion produced by the gRNA targeting. `priming_strategy`
+reports the genotyping approach used (either ‘Flanking’ \[one primer
+pair\] or ‘Dual Pair’ \[two primer pairs\]); `primer_ext_fwd` and
+`primer_ext_rev` for the deletion-flanking primer sequences, and
+`primer_int_fwd` and `primer_int_rev` for primer pair sequences nested
+within the deleted region (Dual Pair only). `exp_wt_size` reports the
+expected wild type amplicon size, and `exp_mut_size` the expected mutant
+amplicon size from the flanking primers. `exp_int_size` reports the
+amplicon size for the nested primer pair.
+
+###### gRNA scoring
+
+The currently working scoring methods are `"ruleset1"` and
+`"deepspcas9"` for Cas9, and `"deepcpf1"` for Cas12a.
+
 Each 5-prime and 3-prime gRNA sequence also has corresponding
-`ontarget_score`, `start` and `end` metadata. The `ontarget_score`
-relates to whatever scoring method you selected when executing
-`run_mutateR()`, while `start` and `end` are the genomic coordinates of
-the start and end of the protospacer sequence.
+`ontarget_score` relating to whatever scoring method you selected when
+executing `run_mutateR()`. Note that the nature of the score will differ
+between methods (e.g., `"ruleset1"` reports a probability value between
+0-1, while `"deepspcas9"` reports a scalar linear regression value
+(usually 0-100, occasionally negative).
+
+###### Other
 
 `domains` contains protein domain annotations corresponding to the
-selected exon pairs derived from the `map_protein_domains()` function,
+region to be deleted derived from the `map_protein_domains()` function,
 while the `recommended` flag is `TRUE` if the gRNA pair meets all
 validity criteria (including both gRNAs passing the on-target scoring
-threshold).
+threshold). Importantly, genotyping primers are only generated for
+recommended gRNA pairs.
 
 ##### Visualisation
 
@@ -1515,16 +2596,15 @@ tp53_arc <- run_mutateR(
   genome = BSgenome.Hsapiens.UCSC.hg38,
   nuclease = "Cas9",
   score_method = 'ruleset1',
+  design_primers = FALSE,
   top_n = NULL,
   quiet = TRUE,
   plot_mode = 'arc'
   )
-#> 
-#> AGG CGG GGG TGG 
-#> 102  36 136 125
 #> Assembling gRNA pairs for exon‑flanking deletions...
+#> Detected probability-based scores (e.g. ruleset1). Using default cutoff: 0.5
 #> Retrieving InterPro domain annotations from Ensembl Genes mart...
-#> Generated 2664 candidate exon‑flanking gRNA pairs.
+#> Generated 2784 candidate exon‑flanking gRNA pairs.
 #> Plotting exon phase compatibility and gRNA pairs...
 
 tp53_arc$plot
@@ -1581,7 +2661,7 @@ flanking nucleotides required for scoring (according to
 
 ``` r
 head(tp53_res$scored_grnas,5)
-#> GRanges object with 5 ranges and 8 metadata columns:
+#> GRanges object with 5 ranges and 9 metadata columns:
 #>       seqnames          ranges strand | exon_rank protospacer_sequence
 #>          <Rle>       <IRanges>  <Rle> | <integer>          <character>
 #>   [1]    chr17 7687381-7687403      + |         1 AAAGTCTAGAGCCACCGTCC
@@ -1596,16 +2676,67 @@ head(tp53_res$scored_grnas,5)
 #>   [3]          AGG AGAGCCACCGTCCAGGGAGC..   7687405 GTCTAGAGCCACCGTCCAGG..
 #>   [4]          TGG TCCAGGGAGCAGGTAGCTGC..   7687415 ACCGTCCAGGGAGCAGGTAG..
 #>   [5]          GGG CCAGGGAGCAGGTAGCTGCT..   7687416 CCGTCCAGGGAGCAGGTAGC..
-#>              gc ontarget_score
-#>       <numeric>      <numeric>
-#>   [1]  0.566667      0.0218384
-#>   [2]  0.566667      0.1859041
-#>   [3]  0.633333      0.1229175
-#>   [4]  0.666667      0.0214385
-#>   [5]  0.700000      0.2763628
+#>              gc ontarget_score scoring_method
+#>       <numeric>      <numeric>    <character>
+#>   [1]  0.566667      0.0218384       ruleset1
+#>   [2]  0.566667      0.1859041       ruleset1
+#>   [3]  0.633333      0.1229175       ruleset1
+#>   [4]  0.666667      0.0214385       ruleset1
+#>   [5]  0.700000      0.2763628       ruleset1
 #>   -------
 #>   seqinfo: 1 sequence from an unspecified genome; no seqlengths
 ```
+
+### A note on primer design
+
+The primer design component of the `mutateR` pipeline relies on the
+`primer3-py` module accessed via the Python backend, and requires the
+correct installation and activation of the `r-mutater` env.
+
+This functionality applies two different primer design strategies
+depending on the expected size of the deletion evoked by a given gRNA
+pair:
+
+- **Strategy A** is a simple, single primer pair approach used for when
+  the wild type amplicon would be \< 3 kb. The forward and reverse
+  primers are positioned slightly distal to the deletion sites,
+  producing a large wild type amplicon and a small mutant one.
+
+- **Strategy B** is a two-pair approach used for very large deletions
+  (where the wild type amplicon size using Strategy A primers would be
+  unreasonably large). The first pair flanks the deletion site, but will
+  only produce an amplicon when the deletion is present (proximalising
+  the primer binding sites). The second primer pair (nested within the
+  deleted region) is used to distinguish wild type and heterozygous
+  genotypes from homozygous ones.
+
+The following parameters are the ones passed to `primer3-py`:
+
+``` python
+base_global_args = {
+        'PRIMER_OPT_SIZE': 20,
+        'PRIMER_MIN_SIZE': 18,
+        'PRIMER_MAX_SIZE': 25,
+        'PRIMER_MIN_GC': 40.0,
+        'PRIMER_MAX_GC': 65.0,
+        'PRIMER_MAX_POLY_X': 4,       # Disallows homopolymers >4 nts
+        'PRIMER_GC_CLAMP': 1,         # Weighted preference for 3' GC clamp
+        'PRIMER_MAX_SELF_ANY': 8.00,
+        'PRIMER_MAX_SELF_END': 3.00,
+        'PRIMER_MAX_NS_ACCEPTED': 0,
+        'PRIMER_NUM_RETURN': 1
+    }
+```
+
+These are not user-facing (changing them requires modification of the
+source code). However, the user can adjust the parameters
+`primer_max_wt` (the wild type amplicon size cutoff \[in nucleotides\]
+before Strategy B is evoked, default `3000`) and `primer_tm` (the target
+primer T<sub>m</sub>, default `60.0`) in `run_mutateR()`.
+
+In order to significantly speed up the primer design process, I have
+applied vectorisation to batch-pass the designed primers between R and
+the Python backend.
 
 ### Special cases
 
@@ -1637,21 +2768,27 @@ opn4.1 <- run_mutateR(gene_id = 'opn4.1',
 #> Retrieving gene/transcript information...
 #> Using transcript: ENSDART00000018501 for gene: opn4.1
 #> Locating Cas9 target sites...
-#> Scoring gRNAs using model: ruleset1
-#> Computing on‑target scores using ruleset1 model...
-#> Re‑orienting 129 guides so PAM = NGG at positions 26–27.
-#> PAM triplet distribution (positions 25–27):
+#> PAM distribution:
 #> 
 #> AGG CGG GGG TGG 
-#>  71  43  68 105
+#>  72  45  68 102
+#> Scoring gRNAs using model: ruleset1
+#> Computing on‑target scores using ruleset1 model...
 #> Scored 287 guides using ruleset1.
 #> Assembling valid gRNA pairs for opn4.1 ...
 #> Assembling gRNA pairs for exon‑flanking deletions...
+#> Detected probability-based scores (e.g. ruleset1). Using default cutoff: 0.5
 #> Single-exon/two-exon gene detected: constructing intragenic deletion pairs.
-#> Generated 41041 intragenic deletion pairs; 435 meet score cutoff.
 #> Detected intragenic assembly mode (≤2 exons).
+#> Designing genotyping primers for 465 recommended pairs...
+#> Preparing primer design batch requests...
+#>   |                                                                              |                                                                      |   0%  |                                                                              |                                                                      |   1%  |                                                                              |=                                                                     |   1%  |                                                                              |=                                                                     |   2%  |                                                                              |==                                                                    |   2%  |                                                                              |==                                                                    |   3%  |                                                                              |===                                                                   |   4%  |                                                                              |===                                                                   |   5%  |                                                                              |====                                                                  |   5%  |                                                                              |====                                                                  |   6%  |                                                                              |=====                                                                 |   6%  |                                                                              |=====                                                                 |   7%  |                                                                              |=====                                                                 |   8%  |                                                                              |======                                                                |   8%  |                                                                              |======                                                                |   9%  |                                                                              |=======                                                               |   9%  |                                                                              |=======                                                               |  10%  |                                                                              |=======                                                               |  11%  |                                                                              |========                                                              |  11%  |                                                                              |========                                                              |  12%  |                                                                              |=========                                                             |  12%  |                                                                              |=========                                                             |  13%  |                                                                              |=========                                                             |  14%  |                                                                              |==========                                                            |  14%  |                                                                              |==========                                                            |  15%  |                                                                              |===========                                                           |  15%  |                                                                              |===========                                                           |  16%  |                                                                              |============                                                          |  17%  |                                                                              |============                                                          |  18%  |                                                                              |=============                                                         |  18%  |                                                                              |=============                                                         |  19%  |                                                                              |==============                                                        |  19%  |                                                                              |==============                                                        |  20%  |                                                                              |==============                                                        |  21%  |                                                                              |===============                                                       |  21%  |                                                                              |===============                                                       |  22%  |                                                                              |================                                                      |  22%  |                                                                              |================                                                      |  23%  |                                                                              |=================                                                     |  24%  |                                                                              |=================                                                     |  25%  |                                                                              |==================                                                    |  25%  |                                                                              |==================                                                    |  26%  |                                                                              |===================                                                   |  26%  |                                                                              |===================                                                   |  27%  |                                                                              |===================                                                   |  28%  |                                                                              |====================                                                  |  28%  |                                                                              |====================                                                  |  29%  |                                                                              |=====================                                                 |  29%  |                                                                              |=====================                                                 |  30%  |                                                                              |=====================                                                 |  31%  |                                                                              |======================                                                |  31%  |                                                                              |======================                                                |  32%  |                                                                              |=======================                                               |  32%  |                                                                              |=======================                                               |  33%  |                                                                              |=======================                                               |  34%  |                                                                              |========================                                              |  34%  |                                                                              |========================                                              |  35%  |                                                                              |=========================                                             |  35%  |                                                                              |=========================                                             |  36%  |                                                                              |==========================                                            |  37%  |                                                                              |==========================                                            |  38%  |                                                                              |===========================                                           |  38%  |                                                                              |===========================                                           |  39%  |                                                                              |============================                                          |  39%  |                                                                              |============================                                          |  40%  |                                                                              |============================                                          |  41%  |                                                                              |=============================                                         |  41%  |                                                                              |=============================                                         |  42%  |                                                                              |==============================                                        |  42%  |                                                                              |==============================                                        |  43%  |                                                                              |===============================                                       |  44%  |                                                                              |===============================                                       |  45%  |                                                                              |================================                                      |  45%  |                                                                              |================================                                      |  46%  |                                                                              |=================================                                     |  46%  |                                                                              |=================================                                     |  47%  |                                                                              |=================================                                     |  48%  |                                                                              |==================================                                    |  48%  |                                                                              |==================================                                    |  49%  |                                                                              |===================================                                   |  49%  |                                                                              |===================================                                   |  50%  |                                                                              |===================================                                   |  51%  |                                                                              |====================================                                  |  51%  |                                                                              |====================================                                  |  52%  |                                                                              |=====================================                                 |  52%  |                                                                              |=====================================                                 |  53%  |                                                                              |=====================================                                 |  54%  |                                                                              |======================================                                |  54%  |                                                                              |======================================                                |  55%  |                                                                              |=======================================                               |  55%  |                                                                              |=======================================                               |  56%  |                                                                              |========================================                              |  57%  |                                                                              |========================================                              |  58%  |                                                                              |=========================================                             |  58%  |                                                                              |=========================================                             |  59%  |                                                                              |==========================================                            |  59%  |                                                                              |==========================================                            |  60%  |                                                                              |==========================================                            |  61%  |                                                                              |===========================================                           |  61%  |                                                                              |===========================================                           |  62%  |                                                                              |============================================                          |  62%  |                                                                              |============================================                          |  63%  |                                                                              |=============================================                         |  64%  |                                                                              |=============================================                         |  65%  |                                                                              |==============================================                        |  65%  |                                                                              |==============================================                        |  66%  |                                                                              |===============================================                       |  66%  |                                                                              |===============================================                       |  67%  |                                                                              |===============================================                       |  68%  |                                                                              |================================================                      |  68%  |                                                                              |================================================                      |  69%  |                                                                              |=================================================                     |  69%  |                                                                              |=================================================                     |  70%  |                                                                              |=================================================                     |  71%  |                                                                              |==================================================                    |  71%  |                                                                              |==================================================                    |  72%  |                                                                              |===================================================                   |  72%  |                                                                              |===================================================                   |  73%  |                                                                              |===================================================                   |  74%  |                                                                              |====================================================                  |  74%  |                                                                              |====================================================                  |  75%  |                                                                              |=====================================================                 |  75%  |                                                                              |=====================================================                 |  76%  |                                                                              |======================================================                |  77%  |                                                                              |======================================================                |  78%  |                                                                              |=======================================================               |  78%  |                                                                              |=======================================================               |  79%  |                                                                              |========================================================              |  79%  |                                                                              |========================================================              |  80%  |                                                                              |========================================================              |  81%  |                                                                              |=========================================================             |  81%  |                                                                              |=========================================================             |  82%  |                                                                              |==========================================================            |  82%  |                                                                              |==========================================================            |  83%  |                                                                              |===========================================================           |  84%  |                                                                              |===========================================================           |  85%  |                                                                              |============================================================          |  85%  |                                                                              |============================================================          |  86%  |                                                                              |=============================================================         |  86%  |                                                                              |=============================================================         |  87%  |                                                                              |=============================================================         |  88%  |                                                                              |==============================================================        |  88%  |                                                                              |==============================================================        |  89%  |                                                                              |===============================================================       |  89%  |                                                                              |===============================================================       |  90%  |                                                                              |===============================================================       |  91%  |                                                                              |================================================================      |  91%  |                                                                              |================================================================      |  92%  |                                                                              |=================================================================     |  92%  |                                                                              |=================================================================     |  93%  |                                                                              |=================================================================     |  94%  |                                                                              |==================================================================    |  94%  |                                                                              |==================================================================    |  95%  |                                                                              |===================================================================   |  95%  |                                                                              |===================================================================   |  96%  |                                                                              |====================================================================  |  97%  |                                                                              |====================================================================  |  98%  |                                                                              |===================================================================== |  98%  |                                                                              |===================================================================== |  99%  |                                                                              |======================================================================|  99%  |                                                                              |======================================================================| 100%
+#> Running Batch Primer3 (465 designs)...
+#> Mapping results to dataframe...
+#> Designed primers for 465/465 pairs.
 #> Plotting exon phase compatibility and gRNA pairs...
-#> mutateR pipeline completed for opn4.1, finding 435 gRNA pairs.
+#> Error in combn(exon_ranks, 2) : n < m
+#> mutateR pipeline completed for opn4.1, finding 465 gRNA pairs.
 ```
 
 ``` r
@@ -1699,12 +2836,22 @@ exon_3p
 
 <th style="text-align:right;">
 
-genomic_deletion_size
+cut_site_5p
 </th>
 
 <th style="text-align:right;">
 
-transcript_deletion_size
+cut_site_3p
+</th>
+
+<th style="text-align:left;">
+
+seqnames_5p
+</th>
+
+<th style="text-align:right;">
+
+genomic_deletion_size
 </th>
 
 <th style="text-align:left;">
@@ -1717,6 +2864,46 @@ transcript_id
 recommended
 </th>
 
+<th style="text-align:left;">
+
+priming_strategy
+</th>
+
+<th style="text-align:left;">
+
+primer_ext_fwd
+</th>
+
+<th style="text-align:left;">
+
+primer_ext_rev
+</th>
+
+<th style="text-align:left;">
+
+primer_int_fwd
+</th>
+
+<th style="text-align:left;">
+
+primer_int_rev
+</th>
+
+<th style="text-align:left;">
+
+exp_wt_size
+</th>
+
+<th style="text-align:right;">
+
+exp_mut_size
+</th>
+
+<th style="text-align:right;">
+
+exp_int_size
+</th>
+
 </tr>
 
 </thead>
@@ -1727,27 +2914,22 @@ recommended
 
 <td style="text-align:left;">
 
-TTAATCAGGGGTCACCACAG
+TCCACACCCTTTCCCCACCG
 </td>
 
 <td style="text-align:left;">
 
-GGTGCAGTTGATGTCTCCAG
+GATCATGCCCACTACATCAT
 </td>
 
 <td style="text-align:right;">
 
-0.5483174
+0.5227872
 </td>
 
 <td style="text-align:right;">
 
-0.5378872
-</td>
-
-<td style="text-align:right;">
-
-1
+0.6101578
 </td>
 
 <td style="text-align:right;">
@@ -1757,12 +2939,27 @@ GGTGCAGTTGATGTCTCCAG
 
 <td style="text-align:right;">
 
-2777
+1
 </td>
 
 <td style="text-align:right;">
 
-2777
+32843416
+</td>
+
+<td style="text-align:right;">
+
+32843447
+</td>
+
+<td style="text-align:left;">
+
+chr2
+</td>
+
+<td style="text-align:right;">
+
+31
 </td>
 
 <td style="text-align:left;">
@@ -1775,166 +2972,44 @@ ENSDART00000018501
 TRUE
 </td>
 
-</tr>
-
-<tr>
-
 <td style="text-align:left;">
 
-ACATATGCTGGATAATTTGG
+Flanking
 </td>
 
 <td style="text-align:left;">
 
-GGTGCAGTTGATGTCTCCAG
-</td>
-
-<td style="text-align:right;">
-
-0.6630494
-</td>
-
-<td style="text-align:right;">
-
-0.5378872
-</td>
-
-<td style="text-align:right;">
-
-1
-</td>
-
-<td style="text-align:right;">
-
-1
-</td>
-
-<td style="text-align:right;">
-
-2768
-</td>
-
-<td style="text-align:right;">
-
-2768
+CACCATGATCCTCCACACCC
 </td>
 
 <td style="text-align:left;">
 
-ENSDART00000018501
+AAACATGTTTCCAGCGGTGC
 </td>
 
 <td style="text-align:left;">
 
-TRUE
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-CCAGCATATGTTTTACGCAA
+NA
 </td>
 
 <td style="text-align:left;">
 
-GGTGCAGTTGATGTCTCCAG
-</td>
-
-<td style="text-align:right;">
-
-0.6543132
-</td>
-
-<td style="text-align:right;">
-
-0.5378872
-</td>
-
-<td style="text-align:right;">
-
-1
-</td>
-
-<td style="text-align:right;">
-
-1
-</td>
-
-<td style="text-align:right;">
-
-2736
-</td>
-
-<td style="text-align:right;">
-
-2736
+NA
 </td>
 
 <td style="text-align:left;">
 
-ENSDART00000018501
-</td>
-
-<td style="text-align:left;">
-
-TRUE
-</td>
-
-</tr>
-
-<tr>
-
-<td style="text-align:left;">
-
-ACACACATATACACTACAGG
-</td>
-
-<td style="text-align:left;">
-
-GGTGCAGTTGATGTCTCCAG
+168
 </td>
 
 <td style="text-align:right;">
 
-0.6773641
+137
 </td>
 
 <td style="text-align:right;">
 
-0.5378872
-</td>
-
-<td style="text-align:right;">
-
-1
-</td>
-
-<td style="text-align:right;">
-
-1
-</td>
-
-<td style="text-align:right;">
-
-2661
-</td>
-
-<td style="text-align:right;">
-
-2661
-</td>
-
-<td style="text-align:left;">
-
-ENSDART00000018501
-</td>
-
-<td style="text-align:left;">
-
-TRUE
+NA
 </td>
 
 </tr>
@@ -1948,7 +3023,7 @@ TCCACACCCTTTCCCCACCG
 
 <td style="text-align:left;">
 
-TTAATCAGGGGTCACCACAG
+GTTTATAGTGAACCTAGCTG
 </td>
 
 <td style="text-align:right;">
@@ -1958,7 +3033,7 @@ TTAATCAGGGGTCACCACAG
 
 <td style="text-align:right;">
 
-0.5483174
+0.6622205
 </td>
 
 <td style="text-align:right;">
@@ -1973,12 +3048,22 @@ TTAATCAGGGGTCACCACAG
 
 <td style="text-align:right;">
 
-2645
+32843416
 </td>
 
 <td style="text-align:right;">
 
-2645
+32843569
+</td>
+
+<td style="text-align:left;">
+
+chr2
+</td>
+
+<td style="text-align:right;">
+
+153
 </td>
 
 <td style="text-align:left;">
@@ -1989,6 +3074,358 @@ ENSDART00000018501
 <td style="text-align:left;">
 
 TRUE
+</td>
+
+<td style="text-align:left;">
+
+Flanking
+</td>
+
+<td style="text-align:left;">
+
+CACCATGATCCTCCACACCC
+</td>
+
+<td style="text-align:left;">
+
+TCTCGAATTTCCTTCCCCGC
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+656
+</td>
+
+<td style="text-align:right;">
+
+503
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+TCCACACCCTTTCCCCACCG
+</td>
+
+<td style="text-align:left;">
+
+TTCAAACAATCCGAGCAGCG
+</td>
+
+<td style="text-align:right;">
+
+0.5227872
+</td>
+
+<td style="text-align:right;">
+
+0.6464406
+</td>
+
+<td style="text-align:right;">
+
+1
+</td>
+
+<td style="text-align:right;">
+
+1
+</td>
+
+<td style="text-align:right;">
+
+32843416
+</td>
+
+<td style="text-align:right;">
+
+32844024
+</td>
+
+<td style="text-align:left;">
+
+chr2
+</td>
+
+<td style="text-align:right;">
+
+608
+</td>
+
+<td style="text-align:left;">
+
+ENSDART00000018501
+</td>
+
+<td style="text-align:left;">
+
+TRUE
+</td>
+
+<td style="text-align:left;">
+
+Flanking
+</td>
+
+<td style="text-align:left;">
+
+CACCATGATCCTCCACACCC
+</td>
+
+<td style="text-align:left;">
+
+CTGACTGGTGAGGGTTGGAC
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+1026
+</td>
+
+<td style="text-align:right;">
+
+418
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+TCCACACCCTTTCCCCACCG
+</td>
+
+<td style="text-align:left;">
+
+AGTGTCAGTTCCCTGACCTT
+</td>
+
+<td style="text-align:right;">
+
+0.5227872
+</td>
+
+<td style="text-align:right;">
+
+0.5869812
+</td>
+
+<td style="text-align:right;">
+
+1
+</td>
+
+<td style="text-align:right;">
+
+1
+</td>
+
+<td style="text-align:right;">
+
+32843416
+</td>
+
+<td style="text-align:right;">
+
+32844551
+</td>
+
+<td style="text-align:left;">
+
+chr2
+</td>
+
+<td style="text-align:right;">
+
+1135
+</td>
+
+<td style="text-align:left;">
+
+ENSDART00000018501
+</td>
+
+<td style="text-align:left;">
+
+TRUE
+</td>
+
+<td style="text-align:left;">
+
+Flanking
+</td>
+
+<td style="text-align:left;">
+
+CACCATGATCCTCCACACCC
+</td>
+
+<td style="text-align:left;">
+
+GCGTTGCAGGCATGTATCAG
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+1654
+</td>
+
+<td style="text-align:right;">
+
+519
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+</tr>
+
+<tr>
+
+<td style="text-align:left;">
+
+TCCACACCCTTTCCCCACCG
+</td>
+
+<td style="text-align:left;">
+
+CTAGTGGGCAGAAATCTGAG
+</td>
+
+<td style="text-align:right;">
+
+0.5227872
+</td>
+
+<td style="text-align:right;">
+
+0.7434274
+</td>
+
+<td style="text-align:right;">
+
+1
+</td>
+
+<td style="text-align:right;">
+
+1
+</td>
+
+<td style="text-align:right;">
+
+32843416
+</td>
+
+<td style="text-align:right;">
+
+32844642
+</td>
+
+<td style="text-align:left;">
+
+chr2
+</td>
+
+<td style="text-align:right;">
+
+1226
+</td>
+
+<td style="text-align:left;">
+
+ENSDART00000018501
+</td>
+
+<td style="text-align:left;">
+
+TRUE
+</td>
+
+<td style="text-align:left;">
+
+Flanking
+</td>
+
+<td style="text-align:left;">
+
+CACCATGATCCTCCACACCC
+</td>
+
+<td style="text-align:left;">
+
+GCGTTGCAGGCATGTATCAG
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+NA
+</td>
+
+<td style="text-align:left;">
+
+1654
+</td>
+
+<td style="text-align:right;">
+
+428
+</td>
+
+<td style="text-align:right;">
+
+NA
 </td>
 
 </tr>
@@ -2032,311 +3469,30 @@ plain text (by copying to the clipboard, as in the above GIF) or as a
 CSV file.
 
 The app’s data table reports the exons in the pair, the two protospacer
-sequences, their on-target scores, as well as the (approximate) genomic-
-and transcript-specific deletion sizes. Additional metadata from the
-`$pairs` data.frame not displayed in the app is included in the exported
-CSV.
-
-Future updates will implement automated genotyping primer design for
-each gRNA pair, and order sheet (e.g. IDT/Thermo)-friendly export
-styles.
+sequences, their on-target scores, the (approximate) genomic- and
+transcript-specific deletion sizes, and genotyping primer sequences.
+Additional metadata from the `$pairs` data.frame not displayed in the
+app is included in the exported CSV.
 
 ## Manual function execution
 
 You may wish to call lower-level functions directly (e.g., for use in
 other programmatic pipelines). Note, however, that many of these
 functions are built to take outputs from other `mutateR` functions.
-
-### `get_gene_info()`
-
-``` r
-tp53_geneinfo <- get_gene_info(gene_id = 'TP53',
-                               species = 'hsapiens',
-                               id_type = 'symbol')
-tp53_geneinfo
-#> $canonical
-#>    ensembl_gene_id ensembl_transcript_id chromosome_name start_position
-#> 25 ENSG00000141510       ENST00000269305              17        7661779
-#>    end_position strand external_gene_name transcript_is_canonical
-#> 25      7687546      -               TP53                    TRUE
-#> 
-#> $all
-#>    ensembl_gene_id ensembl_transcript_id chromosome_name start_position
-#> 25 ENSG00000141510       ENST00000269305              17        7661779
-#> 4  ENSG00000141510       ENST00000359597              17        7661779
-#> 1  ENSG00000141510       ENST00000413465              17        7661779
-#> 13 ENSG00000141510       ENST00000420246              17        7661779
-#> 21 ENSG00000141510       ENST00000445888              17        7661779
-#> 14 ENSG00000141510       ENST00000455263              17        7661779
-#> 19 ENSG00000141510       ENST00000503591              17        7661779
-#> 5  ENSG00000141510       ENST00000504290              17        7661779
-#> 6  ENSG00000141510       ENST00000504937              17        7661779
-#> 32 ENSG00000141510       ENST00000505014              17        7661779
-#> 18 ENSG00000141510       ENST00000508793              17        7661779
-#> 22 ENSG00000141510       ENST00000509690              17        7661779
-#> 7  ENSG00000141510       ENST00000510385              17        7661779
-#> 20 ENSG00000141510       ENST00000514944              17        7661779
-#> 33 ENSG00000141510       ENST00000571370              17        7661779
-#> 31 ENSG00000141510       ENST00000574684              17        7661779
-#> 29 ENSG00000141510       ENST00000576024              17        7661779
-#> 23 ENSG00000141510       ENST00000604348              17        7661779
-#> 11 ENSG00000141510       ENST00000610292              17        7661779
-#> 15 ENSG00000141510       ENST00000610538              17        7661779
-#> 8  ENSG00000141510       ENST00000610623              17        7661779
-#> 9  ENSG00000141510       ENST00000618944              17        7661779
-#> 10 ENSG00000141510       ENST00000619186              17        7661779
-#> 24 ENSG00000141510       ENST00000619485              17        7661779
-#> 12 ENSG00000141510       ENST00000620739              17        7661779
-#> 16 ENSG00000141510       ENST00000622645              17        7661779
-#> 2  ENSG00000141510       ENST00000635293              17        7661779
-#> 3  ENSG00000141510       ENST00000714356              17        7661779
-#> 17 ENSG00000141510       ENST00000714357              17        7661779
-#> 26 ENSG00000141510       ENST00000714358              17        7661779
-#> 30 ENSG00000141510       ENST00000714359              17        7661779
-#> 27 ENSG00000141510       ENST00000714408              17        7661779
-#> 28 ENSG00000141510       ENST00000714409              17        7661779
-#> 34 ENSG00000141510       ENST00000905353              17        7661779
-#> 35 ENSG00000141510       ENST00000923566              17        7661779
-#> 36 ENSG00000141510       ENST00000923567              17        7661779
-#> 37 ENSG00000141510       ENST00000923568              17        7661779
-#> 38 ENSG00000141510       ENST00000923569              17        7661779
-#> 39 ENSG00000141510       ENST00000949117              17        7661779
-#>    end_position strand external_gene_name transcript_is_canonical
-#> 25      7687546      -               TP53                    TRUE
-#> 4       7687546      -               TP53                      NA
-#> 1       7687546      -               TP53                      NA
-#> 13      7687546      -               TP53                      NA
-#> 21      7687546      -               TP53                      NA
-#> 14      7687546      -               TP53                      NA
-#> 19      7687546      -               TP53                      NA
-#> 5       7687546      -               TP53                      NA
-#> 6       7687546      -               TP53                      NA
-#> 32      7687546      -               TP53                      NA
-#> 18      7687546      -               TP53                      NA
-#> 22      7687546      -               TP53                      NA
-#> 7       7687546      -               TP53                      NA
-#> 20      7687546      -               TP53                      NA
-#> 33      7687546      -               TP53                      NA
-#> 31      7687546      -               TP53                      NA
-#> 29      7687546      -               TP53                      NA
-#> 23      7687546      -               TP53                      NA
-#> 11      7687546      -               TP53                      NA
-#> 15      7687546      -               TP53                      NA
-#> 8       7687546      -               TP53                      NA
-#> 9       7687546      -               TP53                      NA
-#> 10      7687546      -               TP53                      NA
-#> 24      7687546      -               TP53                      NA
-#> 12      7687546      -               TP53                      NA
-#> 16      7687546      -               TP53                      NA
-#> 2       7687546      -               TP53                      NA
-#> 3       7687546      -               TP53                      NA
-#> 17      7687546      -               TP53                      NA
-#> 26      7687546      -               TP53                      NA
-#> 30      7687546      -               TP53                      NA
-#> 27      7687546      -               TP53                      NA
-#> 28      7687546      -               TP53                      NA
-#> 34      7687546      -               TP53                      NA
-#> 35      7687546      -               TP53                      NA
-#> 36      7687546      -               TP53                      NA
-#> 37      7687546      -               TP53                      NA
-#> 38      7687546      -               TP53                      NA
-#> 39      7687546      -               TP53                      NA
-```
-
-### `get_exon_structures()`
-
-``` r
-tp53_canonical_tx <- tp53_geneinfo$canonical$ensembl_transcript_id[1] 
-tp53_exons <- get_exon_structures(transcript_id = tp53_canonical_tx,
-                                  species = 'hsapiens',
-                                  output = 'GRanges')
-tp53_exons
-#> GRanges object with 11 ranges and 8 metadata columns:
-#>        seqnames          ranges strand | ensembl_exon_id      rank start_phase
-#>           <Rle>       <IRanges>  <Rle> |     <character> <integer>   <integer>
-#>    [1]       17 7687377-7687490      - | ENSE00003753508         1          -1
-#>    [2]       17 7676521-7676622      - | ENSE00004023728         2          -1
-#>    [3]       17 7676382-7676403      - | ENSE00002419584         3           2
-#>    [4]       17 7675994-7676272      - | ENSE00003625790         4           0
-#>    [5]       17 7675053-7675236      - | ENSE00003518480         5           0
-#>    [6]       17 7674859-7674971      - | ENSE00003723991         6           1
-#>    [7]       17 7674181-7674290      - | ENSE00003712342         7           0
-#>    [8]       17 7673701-7673837      - | ENSE00003725258         8           2
-#>    [9]       17 7673535-7673608      - | ENSE00003786593         9           1
-#>   [10]       17 7670609-7670715      - | ENSE00003545950        10           0
-#>   [11]       17 7668421-7669690      - | ENSE00004023724        11           2
-#>        end_phase cds_start   cds_end transcript_cds_length exon_cds_length
-#>        <integer> <integer> <integer>             <integer>       <integer>
-#>    [1]        -1      <NA>      <NA>                  1182            <NA>
-#>    [2]         2         1        74                  1182              74
-#>    [3]         0        75        96                  1182              22
-#>    [4]         0        97       375                  1182             279
-#>    [5]         1       376       559                  1182             184
-#>    [6]         0       560       672                  1182             113
-#>    [7]         2       673       782                  1182             110
-#>    [8]         1       783       919                  1182             137
-#>    [9]         0       920       993                  1182              74
-#>   [10]         2       994      1100                  1182             107
-#>   [11]        -1      1101      1182                  1182              82
-#>   -------
-#>   seqinfo: 1 sequence from an unspecified genome; no seqlengths
-```
-
-### `find_cas9_sites()`
-
-``` r
-tp53_cas9_sites <- find_cas9_sites(exon_gr = tp53_exons,
-                                   genome = BSgenome.Hsapiens.UCSC.hg38,
-                                   pam = 'NGG',
-                                   protospacer_length = 20)
-tp53_cas9_sites
-#> GRanges object with 399 ranges and 6 metadata columns:
-#>         seqnames          ranges strand | exon_rank protospacer_sequence
-#>            <Rle>       <IRanges>  <Rle> | <integer>          <character>
-#>     [1]    chr17 7687381-7687403      + |         1 AAAGTCTAGAGCCACCGTCC
-#>     [2]    chr17 7687382-7687404      + |         1 AAGTCTAGAGCCACCGTCCA
-#>     [3]    chr17 7687388-7687410      + |         1 AGAGCCACCGTCCAGGGAGC
-#>     [4]    chr17 7687398-7687420      + |         1 TCCAGGGAGCAGGTAGCTGC
-#>     [5]    chr17 7687399-7687421      + |         1 CCAGGGAGCAGGTAGCTGCT
-#>     ...      ...             ...    ... .       ...                  ...
-#>   [395]    chr17 7668434-7668456      - |        11 TGAACATGAGTTTTTTATGG
-#>   [396]    chr17 7668433-7668455      - |        11 GAACATGAGTTTTTTATGGC
-#>   [397]    chr17 7668430-7668452      - |        11 CATGAGTTTTTTATGGCGGG
-#>   [398]    chr17 7668412-7668434      - |        11 GGAGGTAGACTGACCCTTTT
-#>   [399]    chr17 7668404-7668426      - |        11 ACTGACCCTTTTTGGACTTC
-#>         pam_sequence        target_sequence  cut_site       sequence_context
-#>          <character>            <character> <numeric>            <character>
-#>     [1]          AGG AAAGTCTAGAGCCACCGTCC..   7687398 CTCAAAAGTCTAGAGCCACC..
-#>     [2]          GGG AAGTCTAGAGCCACCGTCCA..   7687399 TCAAAAGTCTAGAGCCACCG..
-#>     [3]          AGG AGAGCCACCGTCCAGGGAGC..   7687405 GTCTAGAGCCACCGTCCAGG..
-#>     [4]          TGG TCCAGGGAGCAGGTAGCTGC..   7687415 ACCGTCCAGGGAGCAGGTAG..
-#>     [5]          GGG CCAGGGAGCAGGTAGCTGCT..   7687416 CCGTCCAGGGAGCAGGTAGC..
-#>     ...          ...                    ...       ...                    ...
-#>   [395]          CGG TGAACATGAGTTTTTTATGG..   7668451 GTCTTGAACATGAGTTTTTT..
-#>   [396]          GGG GAACATGAGTTTTTTATGGC..   7668450 TCTTGAACATGAGTTTTTTA..
-#>   [397]          AGG CATGAGTTTTTTATGGCGGG..   7668447 TGAACATGAGTTTTTTATGG..
-#>   [398]          TGG GGAGGTAGACTGACCCTTTT..   7668429 GGCGGGAGGTAGACTGACCC..
-#>   [399]          AGG ACTGACCCTTTTTGGACTTC..   7668421 GTAGACTGACCCTTTTTGGA..
-#>   -------
-#>   seqinfo: 1 sequence from an unspecified genome; no seqlengths
-```
-
-### `find_cas12a_sites()`
-
-``` r
-tp53_cas12a_sites <- find_cas12a_sites(exon_gr = tp53_exons,
-                                       genome = BSgenome.Hsapiens.UCSC.hg38,
-                                       pam = "TTTV",
-                                       protospacer_length = 23)
-tp53_cas12a_sites
-#> GRanges object with 82 ranges and 6 metadata columns:
-#>        seqnames          ranges strand | exon_rank   protospacer_sequence
-#>           <Rle>       <IRanges>  <Rle> | <integer>            <character>
-#>    [1]    chr17 7687434-7687460      + |         1 CGTTCGGGCTGGGAGCGTGC..
-#>    [2]    chr17 7687458-7687484      + |         1 CACGACGGTGACACGCTTCC..
-#>    [3]    chr17 7687435-7687461      - |         1 GCACGCTCCCAGCCCGAACG..
-#>    [4]    chr17 7687411-7687437      - |         1 GTGTCCCCGGAGCCCAGCAG..
-#>    [5]    chr17 7676581-7676607      - |         2 ATGTTTCCTGACTCAGAGGG..
-#>    ...      ...             ...    ... .       ...                    ...
-#>   [78]    chr17 7668613-7668639      - |        11 GCAAATGGAAGTCCTGGGTG..
-#>   [79]    chr17 7668608-7668634      - |        11 TGGAAGTCCTGGGTGCTTCT..
-#>   [80]    chr17 7668557-7668583      - |        11 GACCCAAAACCCAAAATGGC..
-#>   [81]    chr17 7668549-7668575      - |        11 ACCCAAAATGGCAGGGGAGG..
-#>   [82]    chr17 7668542-7668568      - |        11 ATGGCAGGGGAGGGAGAGAT..
-#>        pam_sequence        target_sequence  cut_site       sequence_context
-#>         <character>            <character> <numeric>            <character>
-#>    [1]         TTTG TTTGCGTTCGGGCTGGGAGC..   7687456 ACACTTTGCGTTCGGGCTGG..
-#>    [2]         TTTC TTTCCACGACGGTGACACGC..   7687480 GTGCTTTCCACGACGGTGAC..
-#>    [3]         GAAA GAAAGCACGCTCCCAGCCCG..   7687439 GTGCTTTCCACGACGGTGAC..
-#>    [4]         CAAA CAAAGTGTCCCCGGAGCCCA..   7687415 ACACTTTGCGTTCGGGCTGG..
-#>    [5]         GAAA GAAAATGTTTCCTGACTCAG..   7676585 ACATTTTCAGACCTATGGAA..
-#>    ...          ...                    ...       ...                    ...
-#>   [78]         CAAA CAAAGCAAATGGAAGTCCTG..   7668617 TTGCTTTGTCCCGGGGCTCC..
-#>   [79]         CAAA CAAATGGAAGTCCTGGGTGC..   7668612 TCCATTTGCTTTGTCCCGGG..
-#>   [80]         CAAA CAAAGACCCAAAACCCAAAA..   7668561 GGTCTTTGAACCCTTGCTTG..
-#>   [81]         CAAA CAAAACCCAAAATGGCAGGG..   7668553 GGGTTTTGGGTCTTTGAACC..
-#>   [82]         CAAA CAAAATGGCAGGGGAGGGAG..   7668546 CCATTTTGGGTTTTGGGTCT..
-#>   -------
-#>   seqinfo: 1 sequence from an unspecified genome; no seqlengths
-```
-
-### `score_grnas()`
-
-N.B. Currently only working for Cas9 and `ruleset1`. More rulesets and
-nucleases to be implemented soon! Off-target analysis via `crisprScore`
-for Cas9 (`mit`, `cfd`) also to be implemented in future.
-
-``` r
-tp53_cas9_gRNAs_scored <- score_grnas(grna_gr = tp53_cas9_sites,
-                                      method = 'ruleset1')
-#> Computing on‑target scores using ruleset1 model...
-#> Re‑orienting 214 guides so PAM = NGG at positions 26–27.
-#> PAM triplet distribution (positions 25–27):
-#> 
-#> AGG CGG GGG TGG 
-#> 102  36 136 125
-#> Scored 399 guides using ruleset1.
-tp53_cas9_gRNAs_scored
-#> GRanges object with 399 ranges and 8 metadata columns:
-#>         seqnames          ranges strand | exon_rank protospacer_sequence
-#>            <Rle>       <IRanges>  <Rle> | <integer>          <character>
-#>     [1]    chr17 7687381-7687403      + |         1 AAAGTCTAGAGCCACCGTCC
-#>     [2]    chr17 7687382-7687404      + |         1 AAGTCTAGAGCCACCGTCCA
-#>     [3]    chr17 7687388-7687410      + |         1 AGAGCCACCGTCCAGGGAGC
-#>     [4]    chr17 7687398-7687420      + |         1 TCCAGGGAGCAGGTAGCTGC
-#>     [5]    chr17 7687399-7687421      + |         1 CCAGGGAGCAGGTAGCTGCT
-#>     ...      ...             ...    ... .       ...                  ...
-#>   [395]    chr17 7668434-7668456      - |        11 TGAACATGAGTTTTTTATGG
-#>   [396]    chr17 7668433-7668455      - |        11 GAACATGAGTTTTTTATGGC
-#>   [397]    chr17 7668430-7668452      - |        11 CATGAGTTTTTTATGGCGGG
-#>   [398]    chr17 7668412-7668434      - |        11 GGAGGTAGACTGACCCTTTT
-#>   [399]    chr17 7668404-7668426      - |        11 ACTGACCCTTTTTGGACTTC
-#>         pam_sequence        target_sequence  cut_site       sequence_context
-#>          <character>            <character> <numeric>            <character>
-#>     [1]          AGG AAAGTCTAGAGCCACCGTCC..   7687398 CTCAAAAGTCTAGAGCCACC..
-#>     [2]          GGG AAGTCTAGAGCCACCGTCCA..   7687399 TCAAAAGTCTAGAGCCACCG..
-#>     [3]          AGG AGAGCCACCGTCCAGGGAGC..   7687405 GTCTAGAGCCACCGTCCAGG..
-#>     [4]          TGG TCCAGGGAGCAGGTAGCTGC..   7687415 ACCGTCCAGGGAGCAGGTAG..
-#>     [5]          GGG CCAGGGAGCAGGTAGCTGCT..   7687416 CCGTCCAGGGAGCAGGTAGC..
-#>     ...          ...                    ...       ...                    ...
-#>   [395]          CGG TGAACATGAGTTTTTTATGG..   7668451 GTCTTGAACATGAGTTTTTT..
-#>   [396]          GGG GAACATGAGTTTTTTATGGC..   7668450 TCTTGAACATGAGTTTTTTA..
-#>   [397]          AGG CATGAGTTTTTTATGGCGGG..   7668447 TGAACATGAGTTTTTTATGG..
-#>   [398]          TGG GGAGGTAGACTGACCCTTTT..   7668429 GGCGGGAGGTAGACTGACCC..
-#>   [399]          AGG ACTGACCCTTTTTGGACTTC..   7668421 GTAGACTGACCCTTTTTGGA..
-#>                gc ontarget_score
-#>         <numeric>      <numeric>
-#>     [1]  0.566667      0.0218384
-#>     [2]  0.566667      0.1859041
-#>     [3]  0.633333      0.1229175
-#>     [4]  0.666667      0.0214385
-#>     [5]  0.700000      0.2763628
-#>     ...       ...            ...
-#>   [395]  0.433333      0.4110943
-#>   [396]  0.433333      0.0695857
-#>   [397]  0.433333      0.2398178
-#>   [398]  0.566667      0.0744060
-#>   [399]  0.500000      0.0161947
-#>   -------
-#>   seqinfo: 1 sequence from an unspecified genome; no seqlengths
-```
+Refer to the manual pages for specific input requirements for each
+function.
 
 ## To be implemented
 
 - More nucleases (maybe from CasPEDIA or similar?)
 
-- All `crisprScore` scoring methods
+- All `crisprScore` scoring methods – Work in progress
 
 - Integration of off-target prediction analysis
 
 - Cross-species sequence/domain conservation scoring/visualisation
 
-- Constitutive exon filtering between protein-coding transcripts within
-  a gene
-
 - Workflow for handling of intronic target sequences
-
-- Automatic genotyping primer design functionalities
 
 ## Session information
 
@@ -2372,13 +3528,14 @@ sessionInfo()
 #> [15] Seqinfo_0.99.2                      IRanges_2.43.2                     
 #> [17] S4Vectors_0.47.2                    BiocGenerics_0.55.1                
 #> [19] generics_0.1.4                      mutateR_0.0.1                      
+#> [21] reticulate_1.44.1                  
 #> 
 #> loaded via a namespace (and not attached):
 #>  [1] DBI_1.2.3                   bitops_1.0-9               
 #>  [3] httr2_1.2.1                 biomaRt_2.65.16            
 #>  [5] rlang_1.1.6                 magrittr_2.0.4             
 #>  [7] matrixStats_1.5.0           compiler_4.5.1             
-#>  [9] RSQLite_2.4.4               dir.expiry_1.17.0          
+#>  [9] RSQLite_2.4.5               dir.expiry_1.17.0          
 #> [11] png_0.1-8                   systemfonts_1.3.1          
 #> [13] vctrs_0.6.5                 stringr_1.6.0              
 #> [15] pkgconfig_2.0.3             crayon_1.5.3               
@@ -2391,35 +3548,35 @@ sessionInfo()
 #> [29] blob_1.2.4                  DelayedArray_0.35.3        
 #> [31] BiocParallel_1.43.4         parallel_4.5.1             
 #> [33] prettyunits_1.2.0           R6_2.6.1                   
-#> [35] stringi_1.8.7               reticulate_1.44.1          
-#> [37] Rcpp_1.1.0                  SummarizedExperiment_1.39.2
-#> [39] knitr_1.50                  Matrix_1.7-4               
-#> [41] tidyselect_1.2.1            rstudioapi_0.17.1          
-#> [43] dichromat_2.0-0.1           abind_1.4-8                
-#> [45] yaml_2.3.10                 codetools_0.2-20           
-#> [47] curl_7.0.0                  lattice_0.22-7             
-#> [49] Biobase_2.69.1              withr_3.0.2                
-#> [51] KEGGREST_1.49.1             S7_0.2.1                   
-#> [53] evaluate_1.0.5              crisprScoreData_1.13.0     
-#> [55] BiocFileCache_2.99.6        xml2_1.5.0                 
-#> [57] ExperimentHub_2.99.5        pillar_1.11.1              
-#> [59] BiocManager_1.30.27         filelock_1.0.3             
-#> [61] MatrixGenerics_1.21.0       crisprScore_1.13.1         
-#> [63] RCurl_1.98-1.17             BiocVersion_3.22.0         
-#> [65] hms_1.1.4                   scales_1.4.0               
-#> [67] glue_1.8.0                  tools_4.5.1                
-#> [69] AnnotationHub_3.99.6        GenomicAlignments_1.45.4   
-#> [71] XML_3.99-0.20               grid_4.5.1                 
-#> [73] AnnotationDbi_1.71.1        basilisk_1.21.5            
-#> [75] restfulr_0.0.16             cli_3.6.5                  
-#> [77] rappdirs_0.3.3              kableExtra_1.4.0           
-#> [79] textshaping_1.0.4           viridisLite_0.4.2          
-#> [81] S4Arrays_1.9.1              svglite_2.2.2              
-#> [83] gtable_0.3.6                digest_0.6.39              
-#> [85] SparseArray_1.9.1           rjson_0.2.23               
-#> [87] farver_2.1.2                memoise_2.0.1              
-#> [89] htmltools_0.5.8.1           lifecycle_1.0.4            
-#> [91] httr_1.4.7                  bit64_4.6.0-1
+#> [35] stringi_1.8.7               Rcpp_1.1.0                 
+#> [37] SummarizedExperiment_1.39.2 knitr_1.50                 
+#> [39] Matrix_1.7-4                tidyselect_1.2.1           
+#> [41] rstudioapi_0.17.1           dichromat_2.0-0.1          
+#> [43] abind_1.4-8                 yaml_2.3.11                
+#> [45] codetools_0.2-20            curl_7.0.0                 
+#> [47] lattice_0.22-7              Biobase_2.69.1             
+#> [49] withr_3.0.2                 KEGGREST_1.49.1            
+#> [51] S7_0.2.1                    evaluate_1.0.5             
+#> [53] crisprScoreData_1.13.0      BiocFileCache_2.99.6       
+#> [55] xml2_1.5.0                  ExperimentHub_2.99.5       
+#> [57] pillar_1.11.1               BiocManager_1.30.27        
+#> [59] filelock_1.0.3              MatrixGenerics_1.21.0      
+#> [61] crisprScore_1.13.1          RCurl_1.98-1.17            
+#> [63] BiocVersion_3.22.0          hms_1.1.4                  
+#> [65] scales_1.4.0                glue_1.8.0                 
+#> [67] tools_4.5.1                 AnnotationHub_3.99.6       
+#> [69] GenomicAlignments_1.45.4    XML_3.99-0.20              
+#> [71] grid_4.5.1                  AnnotationDbi_1.71.1       
+#> [73] basilisk_1.21.5             restfulr_0.0.16            
+#> [75] cli_3.6.5                   rappdirs_0.3.3             
+#> [77] textshaping_1.0.4           kableExtra_1.4.0           
+#> [79] viridisLite_0.4.2           S4Arrays_1.9.1             
+#> [81] svglite_2.2.2               gtable_0.3.6               
+#> [83] digest_0.6.39               SparseArray_1.9.1          
+#> [85] rjson_0.2.23                farver_2.1.2               
+#> [87] memoise_2.0.1               htmltools_0.5.8.1          
+#> [89] lifecycle_1.0.4             httr_1.4.7                 
+#> [91] bit64_4.6.0-1
 ```
 
 ## References
