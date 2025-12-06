@@ -6,7 +6,8 @@ Alon M Douek
 - [Overview](#overview)
   - [Background](#background)
   - [Why does this matter?](#why-does-this-matter)
-  - [How can we prevent this?](#how-can-we-prevent-this)
+  - [How can we reduce the likelihood of transcriptional
+    adaptation?](#how-can-we-reduce-the-likelihood-of-transcriptional-adaptation)
 - [How does `mutateR` work?](#how-does-mutater-work)
 - [Getting started](#getting-started)
   - [Installation](#installation)
@@ -31,10 +32,9 @@ deletions.
 It identifies pairs of non-contiguous exons in a given transcript that
 are phase-compatible with each other (*i.e.*, pairs of exons that do not
 normally neighbour each other in the transcript, but the 5’ exon ends in
-the same reading frame position (0, 1, or 2) as the 3’ exon begins
-with), then detects gRNAs in each exon that facilitate their deletion
-such that the resulting mutant allele preserves the original reading
-frame.
+the same reading frame position (0, 1, or 2) as the 3’ exon begins),
+then detects gRNAs in each exon that facilitate their deletion such that
+the resulting mutant allele preserves the original reading frame.
 
 ### Background
 
@@ -82,7 +82,15 @@ NMD of the Gene A transcript. While this is *great* for the animal (it
 has a largely “normal” brain!), it means that we can’t really use our
 Gene A mutant to reliably study the effects of loss of Gene A function.
 
-### How can we prevent this?
+**An important caveat:** Transcriptional adaptation is not universal
+(i.e., some genes are more prone to this behaviour than others, and it
+is observed more frequently in some biological contexts than in others).
+While `mutateR` assumes that your gene of interest is prone to
+transcriptional adaptation when recommending gRNA pairs, you should
+always base your mutagenesis rationale on the requirements of your
+specific experimental design.
+
+### How can we reduce the likelihood of transcriptional adaptation?
 
 In short, **use tools for targeted mutagenesis to their strengths**.
 Back when the only way to make a mutant animal was to randomly
@@ -116,15 +124,20 @@ joined together by DNA repair mechanisms.
 information for your gene of interest, then calculates which pairs of
 non-contiguous exons are phase-compatible. It then scans these exons for
 Cas effector PAMs (currently Cas9 NGG and Cas12a TTTV) associated with
-protospacers that do not cross exon boundaries. After calculating
-on-target scores for potential gRNAs using rule sets from `crisprScore`
-([Hoberecht et al., *Nature Communications*
+protospacers that do not cross exon boundaries.
+
+After calculating on-target scores for potential gRNAs using rule sets
+from `crisprScore` ([Hoberecht et al., *Nature Communications*
 (2022)](https://www.nature.com/articles/s41467-022-34320-7 "A comprehensive Bioconductor ecosystem for the design of CRISPR guide RNAs across nucleases and technologies"))
-where possible, or by manuel re-implementation of methods not available
+where possible, or by manual re-implementation of methods not available
 from `crisprScore`, `mutateR` returns recommended gRNA pairs to target
-exons where the flanking exons are in-frame with each other. It also
-produces a graphical representation of the selected transcript, its
-phase-compatible exons, and the recommended exon pairs for targeting.
+exons where the flanking exons are in-frame with each other.
+
+It also produces a graphical representation of the selected transcript,
+its phase-compatible exons, and the recommended exon pairs for
+targeting. Successful `mutateR` pipeline executions can now be passed to
+the `mutateR_viewer()` function for further inspection in an interactive
+Shiny app.
 
 > As of December 2025, `mutateR` utilises a Python backend (via
 > `reticulate`) to allow for implementation of python-dependent
@@ -151,15 +164,15 @@ The `mutateR` package consists of the following ordered functions:
 | 4 | `check_exon_phase()` | Determine phase-compatible exon pairs. |
 | 5 | `check_frameshift_ptc()` | Calculate and flag frameshift/PTC consequences. |
 | 6 | `map_protein_domains()` | Retrieve protein domain annotations from InterPro corresponding to exons. |
-| 7 | `score_gRNAs()` | Score guide RNAs via `crisprScore`. |
-| 8 | `filter_valid_gRNAs()` and `assemble_gRNA_pairs()` | Filter allowed gRNA pairs and assemble into a readable data.frame. |
-| 9 | `plot_gRNA_design()` | Visualise phase compatibility of non-contiguous exon pairs and top-ranked valid gRNA pairs. |
-| 10 | `plot_grna_heatmap()` | For large gene (\>12 exons) visualisation - helper function for `plot_grna_design()` but can be executed separately. |
+| 7 | `score_grnas()` | Score guide RNAs via `crisprScore`. |
+| 8 | `filter_valid_grnas()` and `assemble_grna_pairs()` | Filter allowed gRNA pairs and assemble into a readable data.frame. |
+| 9 | `plot_grna_design()` | Visualise phase compatibility of non-contiguous exon pairs and top-ranked valid gRNA pairs. |
+| 10 | `plot_grna_heatmap()` | Helper function for `plot_grna_design()` but can be executed separately. |
 | 11 | `plot_grna_interactive()` | Helper function for interactive plotting mode. |
 | 12 | `run_mutateR()` | Wrapper; runs entire pipeline. |
 | 13 | `mutateR_viewer()` | Launches an Shiny app for gRNA extraction from an interactive heatmap. |
 
-`mutateR` also has an additional function, `design_gRNA_pairs()`, that
+`mutateR` also has an additional function, `design_grna_pairs()`, that
 is not included in the wrapper function. This function can be used in
 isolation to produce a data.frame of gRNA pairs for the gene of
 interest. Other scripts such as `deep_learning_utils.R`, `python_env.R`,
@@ -255,7 +268,7 @@ it as `r-mutater`. This will only last for the current R session and
 will revert to the default upon session restart (i.e., you will need to
 reactivate the env each time you initiate a new session, but you will
 only need to *reinstall* the env if a new dependency is added or if it
-is corrupter).
+is corrupted).
 
 Once the env is successfully activated, `[1] TRUE` will be printed in
 the console. At this point, you will be able to make use of the full
@@ -2481,21 +2494,21 @@ NA
 
 ### Interpreting the `run_mutateR()` output
 
-##### The `pairs` data.frame
+#### The `pairs` data.frame
 
 `$pairs` contains several columns - some of these are not strictly
 useful for the end-user (e.g. genomic coordinates), but most represent
 the primary output of the pipeline. The below sections will elaborate on
 these:
 
-###### Flanking and targeted exons
+##### Flanking and targeted exons
 
 `upstream_exon` and `downstream_exon` refer to the two phase-compatible
 exons, while `exon_5p` and `exon_3p` refer to the 5-prime and 3-prime
 exons to simultaneously target using the selected gRNAs in that row of
 the data.frame.
 
-###### Pair classification flags
+##### Pair classification flags
 
 Each gRNA pair is annotated by several classifications. The `compatible`
 flag (`run_mutateR()` currently only returns compatible exon pairs)
@@ -2507,7 +2520,7 @@ the selected transcript. Final-exon PTCs induce NMD with far lower
 efficiency than those in non-terminal exons, and are significantly less
 likely to result in transcriptional compensatory behaviour.
 
-###### gRNA pairs and associated deletion sizes
+##### gRNA pairs and associated deletion sizes
 
 The actual gRNA protospacer sequences are given in
 `protospacer_sequence_5p` and `protospacer_sequence_3p` (with 5p and 3p
@@ -2523,7 +2536,7 @@ For each gRNA pair, the expected deletion size at both the genomic and
 transcript level is reported in `genomic_deletion_size` and
 `transcript_deletion_size`, respectively.
 
-###### Genotyping primers and amplicon sizes
+##### Genotyping primers and amplicon sizes
 
 `run_mutateR()` now also automatically generates a pair (or two,
 depending on the nature of the deletion - see [A note on primer
@@ -2538,10 +2551,29 @@ expected wild type amplicon size, and `exp_mut_size` the expected mutant
 amplicon size from the flanking primers. `exp_int_size` reports the
 amplicon size for the nested primer pair.
 
-###### gRNA scoring
+##### gRNA scoring
 
 The currently working scoring methods are `"ruleset1"` and
-`"deepspcas9"` for Cas9, and `"deepcpf1"` for Cas12a.
+`"deepspcas9"` for Cas9, and `"deepcpf1"` for Cas12a. More will be added
+over time!
+
+`ruleset1` is implemented via `crisprScore` and works in an R-only
+environment, but the latter two require activation of the `r-mutater`
+Python env. The weights for the deep learning-based methods can be found
+in `inst/extdata`. Please note that in the context of `mutateR`,
+`deepcpf1` refers to the
+[Seq-DeepCpf1](https://www.nature.com/articles/nbt.4061) model
+(sequence-only, without training on chromatin accessibility
+information).
+
+> Please also note that the authors of
+> [DeepSpCas9](https://www.science.org/doi/10.1126/sciadv.aax9249)
+> provided the training data (as TensorFlow checkpoint files) rather
+> than as explicit weights. I have attempted to reconstruct the weights
+> based on the model topology reported in the paper, and while it seems
+> to be reporting values within the range expected, these scores should
+> be treated with caution until I can do some more validation that my
+> weights are equivalent to the ones used by the authors.
 
 Each 5-prime and 3-prime gRNA sequence also has corresponding
 `ontarget_score` relating to whatever scoring method you selected when
@@ -2550,7 +2582,7 @@ between methods (e.g., `"ruleset1"` reports a probability value between
 0-1, while `"deepspcas9"` reports a scalar linear regression value
 (usually 0-100, occasionally negative).
 
-###### Other
+##### Other
 
 `domains` contains protein domain annotations corresponding to the
 region to be deleted derived from the `map_protein_domains()` function,
@@ -2559,9 +2591,9 @@ validity criteria (including both gRNAs passing the on-target scoring
 threshold). Importantly, genotyping primers are only generated for
 recommended gRNA pairs.
 
-##### Visualisation
+#### Visualisation
 
-###### Static visualisation modes
+##### Static visualisation modes
 
 `mutateR` also produces a basic visualisation for exon
 phase-compatibility, by default a heatmap.
@@ -2612,7 +2644,7 @@ tp53_arc$plot
 
 ![](README_files/figure-gfm/mutateR_plot_arc-1.png)<!-- -->
 
-###### Interactive visualisation modes
+##### Interactive visualisation modes
 
 `mutateR` now offers an interactive heatmap plotting mode which can be
 evoked by specifying `interactive = TRUE` inside `run_mutateR()`.
@@ -2624,7 +2656,7 @@ is used as the basis for the much more useful `mutateR_viewer` Shiny app
 
 ![](README_files/figure-gfm/heat_int.gif)
 
-##### Other data levels
+#### Other data levels
 
 The `run_mutateR()` output also contains two GRanges objects: `exons`
 and `scored_grnas`.
@@ -2739,6 +2771,40 @@ applied vectorisation to batch-pass the designed primers between R and
 the Python backend.
 
 ### Special cases
+
+#### When the same exon is targeted twice
+
+In certain cases, both gRNAs in a pair will target the same exon (e.g.,
+if two phase-compatible exons are separated by a single exon, such that
+the intervening exon is to be removed). In these cases, specific rules
+need to be applied in order to prevent the generation of small deletions
+that would likely cause the retention of a frameshifted exon remnant in
+the mature mRNA, and a consequent PTC.
+
+To account for these, I have applied the following filters during gRNA
+pair assembly for pairs where both gRNAs target the same exon:
+
+- Do not recommend gRNA pairs that would be expected to cause a deletion
+  of \<50 bp (small deletions can be annoying to genotype, can cause
+  frameshifted exon retention + PTC, and if gRNAs target loci too close
+  to each other they can cause steric hindrance between Cas RNPs,
+  thereby preventing the required simultaneous DSBs).
+
+- Only recommend gRNA pairs that would result in removal of \>70% of the
+  original exon mass **OR** if the residual exon fragment is \<50 nt.
+
+  - We calculate the residual exon mass (REM) by subtracting the
+    expected genomic deletion size from the exon length, then determine
+    a deletion ratio by dividing the deletion size by the exon length.
+
+  - Removal of a large portion of the exon will increase the likelihood
+    of removing important exonic splicing enhancers (ESEs), which will
+    lead to the exclusion of the remaining exon fragment.
+
+  - Residual exon fragments \<50 bp in length are frequently excluded by
+    the spliceosome during mature mRNA assembly (see [Hwang and Cohen,
+    MCB
+    (1997)](https://www.tandfonline.com/doi/abs/10.1128/MCB.17.12.7099)).
 
 #### Small genes
 
@@ -3445,13 +3511,11 @@ useful information yet.
 If a PTC occurs in the terminal exon of a gene, the PTC-bearing
 transcript is unlikely to induce NMD and subsequent compensation (an
 example of such an allele is the *sgsh<sup>Δex5−6</sup>* zebrafish
-mutant in <a href="https://www.mdpi.com/1422-0067/22/11/5948"
-style="font-size: 11pt;"
-title="An Engineered sgsh Mutant Zebrafish Recapitulates Molecular and Behavioural Pathobiology of Sanfilippo Syndrome A/MPS IIIA">Douek
-et al., IJMS (2021)</a>). `mutateR` factors in predicted terminal exon
-PTCs when scanning for tolerated deletions, and flags these cases in the
-`run_mutateR` output in the `$pairs` dataframe, under the
-`terminal_exon_case` column.
+mutant in [Douek et al., IJMS
+(2021)](https://www.mdpi.com/1422-0067/22/11/5948 "An Engineered sgsh Mutant Zebrafish Recapitulates Molecular and Behavioural Pathobiology of Sanfilippo Syndrome A/MPS IIIA")).
+`mutateR` factors in predicted terminal exon PTCs when scanning for
+tolerated deletions, and flags these cases in the `run_mutateR` output
+in the `$pairs` dataframe, under the `terminal_exon_case` column.
 
 ## Using the `mutateR_viewer`
 
@@ -3574,7 +3638,7 @@ sessionInfo()
 #> [81] svglite_2.2.2               gtable_0.3.6               
 #> [83] digest_0.6.39               SparseArray_1.9.1          
 #> [85] rjson_0.2.23                farver_2.1.2               
-#> [87] memoise_2.0.1               htmltools_0.5.8.1          
+#> [87] memoise_2.0.1               htmltools_0.5.9            
 #> [89] lifecycle_1.0.4             httr_1.4.7                 
 #> [91] bit64_4.6.0-1
 ```
@@ -3598,11 +3662,6 @@ Ma, Z. *et al.* PTC-bearing mRNA elicits a genetic compensation response
 via Upf3a and COMPASS components. *Nature* **568**, 259–263 (2019).
 <https://doi.org/10.1038/s41586-019-1057-y>
 
-Douek, A. M. *et al.* An Engineered sgsh Mutant Zebrafish Recapitulates
-Molecular and Behavioural Pathobiology of Sanfilippo Syndrome A/MPS
-IIIA. *Int J Mol Sci* **22**, 5948 (2021).
-<https://doi.org/10.3390/ijms22115948>
-
 Scott, D. A. & Zhang, F. Implications of human genetic variation in
 CRISPR-based therapeutic genome editing. *Nat Med* **23**, 1095–1101
 (2017). <https://doi.org/10.1038/nm.4377>
@@ -3610,3 +3669,21 @@ CRISPR-based therapeutic genome editing. *Nat Med* **23**, 1095–1101
 Yang, W., Zhu, J. K. & Jin, W. A catalog of gene editing sites and
 genetic variations in editing sites in model organisms. *BMC Genomics*
 **25**, 1153 (2024). <https://doi.org/10.1186/s12864-024-11073-9>
+
+Kim, H. K. *et al.* Deep learning improves prediction of CRISPR-Cpf1
+guide RNA activity. *Nat Biotechnol* **36**, 239–241 (2018).
+<https://doi.org/10.1038/nbt.4061>
+
+Kim, H. K. *et al.* SpCas9 activity prediction by DeepSpCas9, a deep
+learning-based model with high generalization performance. *Sci Adv*
+**5**, eaax9249 (2019). <https://doi.org/10.1126/sciadv.aax9249>
+
+Hwang, D. Y. & Cohen, J. B. U1 small nuclear RNA-promoted exon selection
+requires a minimal distance between the position of U1 binding and the
+3’ splice site across the exon. *Mol Cell Biol* **17**, 7099–7107
+(1997). <https://doi.org/10.1128/MCB.17.12.7099>
+
+Douek, A. M. *et al.* An Engineered sgsh Mutant Zebrafish Recapitulates
+Molecular and Behavioural Pathobiology of Sanfilippo Syndrome A/MPS
+IIIA. *Int J Mol Sci* **22**, 5948 (2021).
+<https://doi.org/10.3390/ijms22115948>
