@@ -1,6 +1,6 @@
 Package: mutateR
 Title: Identify Optimal Frame-Aware Sites for Cas Effector-Mediated Deletions
-Version: 0.0.1
+Version: 0.1.0
 Depends: R (>= 4.2.0)
 Imports: biomaRt, GenomicRanges, IRanges, GenomeInfoDb, Biostrings, dplyr, ggplot2, tibble, RColorBrewer, crisprScore, httr, plotly, reticulate
 Suggests: crisprDesign, GenomicFeatures, crisprBase, crisprBowtie, AnnotationHub, ensembldb, BSgenome, testthat (>= 3.0.0), knitr, rmarkdown, tidyr, shiny, DT
