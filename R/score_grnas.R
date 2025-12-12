@@ -1,22 +1,24 @@
 #' On-target scoring for gRNAs
 #'
-#' Currently handles RuleSet1 and Azimuth (Cas9), DeepSpCas9 (Cas9), and DeepCpf1 (Cas12a).
+#' Currently handles RuleSet1 and Azimuth (Cas9), DeepSpCas9 (Cas9), RuleSet 3 (Cas9) and DeepCpf1 (Cas12a).
 #' Automatically routes deep learning methods to the internal Python backend on Windows (requires miniconda and separate env install, see [install_mutater_env()].
 #'
 #' @param grna_gr GRanges returned by find_cas9_sites() or find_cas12a_sites().
 #' @param method Scoring model name. Default "ruleset1".
+#' @param tracr Character. For Rule Set 3 scoring; one of "Chen2013" (default) or "Hsu2013".
 #' @return GRanges with added metadata columns `ontarget_score` and `scoring_method`.
 #' @export
 score_grnas <- function(grna_gr,
                         method = c("ruleset1","azimuth","ruleset3",
                                    "deepspcas9","deephf",
-                                   "deepcpf1","enpamgb")) {
+                                   "deepcpf1","enpamgb"),
+                        tracr = "Chen2013") {
 
   method <- match.arg(method)
   os_is_windows <- identical(.Platform$OS.type, "windows")
 
   # ---- 1. Unsupported models on Windows ----
-  unsupported_windows <- c("ruleset3", "deephf", "enpamgb")
+  unsupported_windows <- c("deephf", "enpamgb")
 
   if (os_is_windows && tolower(method) %in% unsupported_windows) {
     warning("The ", method, " model is not supported on Windows. Returning NA scores.")
@@ -49,11 +51,13 @@ score_grnas <- function(grna_gr,
   scores_raw <- NULL
 
   # ---- 3. SpCas9 Models (Probability-based) -----------------------
+  # Rule Set 1
   if (tolower(method) == "ruleset1") {
     if (!requireNamespace("crisprScore", quietly = TRUE)) stop("crisprScore required.")
     scores_raw <- crisprScore::getRuleSet1Scores(toupper(seqs))
   }
 
+  # Azimuth - not yet tested for functionality - TO DO
   if (tolower(method) == "azimuth") {
     if (!requireNamespace("crisprScore", quietly = TRUE)) stop("crisprScore required.")
     # Azimuth requires 'NGG' explicitly in the sequence context usually provided by crisprScore
@@ -67,7 +71,24 @@ score_grnas <- function(grna_gr,
     scores_raw <- scores_vec
   }
 
-  # ---- 4. DeepSpCas9 (Internal Backend Integration) ---------------
+  # Rule Set 3 (via Python backend)
+  if (tolower(method) == "ruleset3") {
+    message("Using mutateR internal Python backend for RS3 (tracrRNA: ", tracr, ")...")
+
+    if (!check_mutater_env()) {
+      warning("Python environment not ready. Running install_mutater_env()...")
+      install_mutater_env()
+    }
+
+    scores_raw <- tryCatch({
+      predict_rs3_python(seqs, tracr = tracr, n_jobs = 1L)
+    }, error = function(e) {
+      warning("RS3 inference failed: ", e$message)
+      return(rep(NA_real_, length(seqs)))
+    })
+  }
+
+  # ---- 4. DeepSpCas9 (via Python backend) ---------------
   if (tolower(method) == "deepspcas9") {
     use_internal_backend <- os_is_windows
 
@@ -110,7 +131,8 @@ score_grnas <- function(grna_gr,
     scores_raw <- crisprScore::getDeepHFScores(toupper(seq23))
   }
 
-  # ---- 6. Cas12a Models (DeepCpf1) --------------------------------
+  # ---- 6. Cas12a Models --------------------------------
+  # DeepCpf1 (via Python backend)
   if (tolower(method) == "deepcpf1") {
     use_internal_backend <- os_is_windows
 

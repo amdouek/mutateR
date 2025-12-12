@@ -11,6 +11,7 @@ run_mutateR(
   nuclease = c("Cas9", "Cas12a"),
   transcript_id = NULL,
   score_method = NULL,
+  tracr = "Chen2013",
   min_score = NULL,
   design_primers = TRUE,
   primer_max_wt = 3000,
@@ -33,7 +34,9 @@ run_mutateR(
 \item{transcript_id}{Optional Ensembl transcript ID to override canonical.}
 
 \item{score_method}{Character. On‑target scoring model:
-Cas9: "ruleset1", "azimuth", "deephf";  Cas12a: "deepcpf1".}
+Cas9: "ruleset1", "azimuth", "deephf", "deepspcas9", "ruleset3";  Cas12a: "deepcpf1".}
+
+\item{tracr}{Character. For Rule Set 3 scoring - one of "Chen2013" (default) or "Hsu2013".}
 
 \item{min_score}{Numeric. Optional override for on-target score cutoff.
 If NULL (default), auto-selects (0.5 for Cas9 models, 50 for DeepCpf1).}

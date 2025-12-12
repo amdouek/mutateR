@@ -27,12 +27,16 @@ assemble_grna_pairs <- function(grna_gr,
     # Check metadata for scoring method
     method <- if ("scoring_method" %in% names(mcols(grna_gr))) unique(mcols(grna_gr)$scoring_method)[1] else "ruleset1"
 
-    # Define regression-based models
+    # Define model categories by output type
     regression_models <- c("deepcpf1", "deepspcas9")
+    zscore_models <- c("ruleset3")
 
     if (!is.na(method) && tolower(method) %in% regression_models) {
       score_cutoff <- 50
       message("Detected linear regression scores (", method, "). Using default cutoff: ", score_cutoff)
+    } else if (!is.na(method) && tolower(method) %in% zscore_models) {
+      score_cutoff <- 0.1
+      message("Detected z-scored activity model (", method, "). Using default cutoff: ", score_cutoff)
     } else {
       score_cutoff <- 0.5
       message("Detected probability-based scores (e.g. ", method, "). Using default cutoff: ", score_cutoff)

@@ -60,7 +60,7 @@ It also produces a graphical representation of the selected transcript, its phas
 The `mutateR` package consists of the following ordered functions:
 
 | Step | Function | Functionality |
-|------------------------|------------------------|------------------------|
+|----|----|----|
 | 1 | `get_gene_info()` | Query Ensembl for gene and transcript metadata. |
 | 2 | `get_exon_structures()` | Retrieve exon coordinates and phase metadata. |
 | 3 | `find_cas9_sites()`/`find_cas12a_sites()` | Identify nuclease recognition sites. |

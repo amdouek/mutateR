@@ -7,18 +7,21 @@
 score_grnas(
   grna_gr,
   method = c("ruleset1", "azimuth", "ruleset3", "deepspcas9", "deephf", "deepcpf1",
-    "enpamgb")
+    "enpamgb"),
+  tracr = "Chen2013"
 )
 }
 \arguments{
 \item{grna_gr}{GRanges returned by find_cas9_sites() or find_cas12a_sites().}
 
 \item{method}{Scoring model name. Default "ruleset1".}
+
+\item{tracr}{Character. For Rule Set 3 scoring; one of "Chen2013" (default) or "Hsu2013".}
 }
 \value{
 GRanges with added metadata columns \code{ontarget_score} and \code{scoring_method}.
 }
 \description{
-Currently handles RuleSet1 and Azimuth (Cas9), DeepSpCas9 (Cas9), and DeepCpf1 (Cas12a).
+Currently handles RuleSet1 and Azimuth (Cas9), DeepSpCas9 (Cas9), RuleSet 3 (Cas9) and DeepCpf1 (Cas12a).
 Automatically routes deep learning methods to the internal Python backend on Windows (requires miniconda and separate env install, see \code{\link[=install_mutater_env]{install_mutater_env()}}.
 }

@@ -8,7 +8,9 @@ filter_valid_grnas(
   exon_gr,
   genome,
   species,
-  score_method = c("ruleset1", "azimuth", "deephf", "deepcpf1", "deepspcas9")
+  score_method = c("ruleset1", "azimuth", "deephf", "deepcpf1", "deepspcas9", "ruleset3"),
+  scored_grnas = NULL,
+  tracr = "Chen2013"
 )
 }
 \arguments{
@@ -18,7 +20,11 @@ filter_valid_grnas(
 
 \item{species}{Character, e.g. "hsapiens".}
 
-\item{score_method}{Character. One of "ruleset1", "azimuth", "deephf", "deepcpf1" or "deepspcas9".}
+\item{score_method}{Character. One of "ruleset1", "azimuth", "deepspcas9", "deephf", "ruleset3 (Cas9) or "deepcpf1" (Cas12a).}
+
+\item{scored_grnas}{Precomputed on-target scores passed from elsewhere (default NULL, evokes scoring).}
+
+\item{tracr}{Character, either "Chen2013" (default) or "Hsu2013" - only for ruleset3 scoring.}
 }
 \value{
 GRanges of scored, biologically admissible gRNAs.

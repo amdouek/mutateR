@@ -14,7 +14,8 @@
 #' @param nuclease Character. One of "Cas9" or "Cas12a" (default "Cas9").
 #' @param transcript_id Optional Ensembl transcript ID to override canonical.
 #' @param score_method Character. On‑target scoring model:
-#'        Cas9: "ruleset1", "azimuth", "deephf";  Cas12a: "deepcpf1".
+#'        Cas9: "ruleset1", "azimuth", "deephf", "deepspcas9", "ruleset3";  Cas12a: "deepcpf1".
+#' @param tracr Character. For Rule Set 3 scoring - one of "Chen2013" (default) or "Hsu2013".
 #' @param min_score Numeric. Optional override for on-target score cutoff.
 #'        If NULL (default), auto-selects (0.5 for Cas9 models, 50 for DeepCpf1).
 #' @param design_primers Logical. Whether to design genotyping primers (default TRUE).
@@ -39,6 +40,7 @@ run_mutateR <- function(gene_id,
                         nuclease = c("Cas9", "Cas12a"),
                         transcript_id = NULL,
                         score_method = NULL,
+                        tracr = "Chen2013",
                         min_score = NULL,
                         design_primers = TRUE,
                         primer_max_wt = 3000,
@@ -122,12 +124,18 @@ run_mutateR <- function(gene_id,
   }
 
   ## ----- Step 4: Scoring -----
-  if (!quiet) message("Scoring gRNAs using model: ", score_method)
+  if (!quiet) {
+    msg <- paste0("Scoring gRNAs using model: ", score_method)
+    if (score_method == "ruleset3") {
+      msg <- paste0(msg, " (tracrRNA: ", tracr, ")")
+    }
+    message(msg)
+  }
 
   if (quiet) {
     suppressMessages({scored_grnas <- score_grnas(hits, method = score_method)})
   } else {
-    scored_grnas <- score_grnas(hits, method = score_method)
+    scored_grnas <- score_grnas(hits, method = score_method, tracr = tracr)
   }
 
   ## ----- Step 5: Assembly -----
@@ -136,7 +144,9 @@ run_mutateR <- function(gene_id,
   valid_grnas <- suppressMessages({
     suppressWarnings({
       tmp <- capture.output(
-        val <- filter_valid_grnas(exons_gr, genome, species, score_method)
+        val <- filter_valid_grnas(exons_gr, genome, species, score_method,
+                                  scored_grnas = scored_grnas,
+                                  tracr = tracr)
       )
       val
     })

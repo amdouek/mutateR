@@ -7,14 +7,18 @@
 #' @param exon_gr  GRanges from get_exon_structures(output="GRanges").
 #' @param genome   BSgenome object for the relevant species.
 #' @param species  Character, e.g. "hsapiens".
-#' @param score_method Character. One of "ruleset1", "azimuth", "deephf", "deepcpf1" or "deepspcas9".
+#' @param score_method Character. One of "ruleset1", "azimuth", "deepspcas9", "deephf", "ruleset3 (Cas9) or "deepcpf1" (Cas12a).
+#' @param scored_grnas Precomputed on-target scores passed from elsewhere (default NULL, evokes scoring).
+#' @param tracr Character, either "Chen2013" (default) or "Hsu2013" - only for ruleset3 scoring.
 #'
 #' @return GRanges of scored, biologically admissible gRNAs.
 #' @export
 filter_valid_grnas <- function(exon_gr,
                                genome,
                                species,
-                               score_method = c("ruleset1","azimuth","deephf","deepcpf1","deepspcas9")) {
+                               score_method = c("ruleset1","azimuth","deephf","deepcpf1","deepspcas9","ruleset3"),
+                               scored_grnas = NULL,
+                               tracr = "Chen2013") {
 
   score_method <- match.arg(score_method)
 
@@ -62,18 +66,24 @@ filter_valid_grnas <- function(exon_gr,
   ))
 
   ## ---- 2. Collect and score Cas9 sites -------------------------------
-  if (score_method == "deepcpf1") {
-    grna_sites <- find_cas12a_sites(exon_gr, genome)
+  if (!is.null(scored_grnas)) {
+    # Use pre-scored gRNAs if provided
+    grna_sites <- scored_grnas
   } else {
-    grna_sites <- find_cas9_sites(exon_gr, genome)
-  }
+    # Otherwise, find and score (legacy behaviour)
+    if (score_method == "deepcpf1") {
+      grna_sites <- find_cas12a_sites(exon_gr, genome)
+    } else {
+      grna_sites <- find_cas9_sites(exon_gr, genome)
+    }
 
-  if (is.null(grna_sites) || length(grna_sites) == 0) {
-    warning("No sites found within provided exons.")
-    return(NULL)
-  }
+    if (is.null(grna_sites) || length(grna_sites) == 0) {
+      warning("No sites found within provided exons.")
+      return(NULL)
+    }
 
-  grna_sites <- score_grnas(grna_sites, method = score_method)
+    grna_sites <- score_grnas(grna_sites, method = score_method, tracr = tracr)
+  }
 
   ## ---- 3. Annotate exon rank if missing -------------------------------
   if (!"exon_rank" %in% names(mcols(grna_sites))) {
