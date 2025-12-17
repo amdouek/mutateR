@@ -108,7 +108,7 @@ run_mutateR <- function(gene_id,
     if (!quiet) message("Auto-selected scoring method '", score_method, "' for ", nuclease)
   }
 
-  ## ----- Step 1: Gene Info -----
+  ## ----- Step 1: Gene info -----
   if (!quiet) message("Retrieving gene/transcript information...")
   tx_info <- get_gene_info(gene_id, species)
 
@@ -219,7 +219,7 @@ run_mutateR <- function(gene_id,
     }
   )
 
-  ## ----- Step 6: Intragenic Detection & Unpacking -----
+  ## ----- Step 6: Intragenic detection & unpacking -----
   intragenic_mode <- FALSE
   if (is.list(pairs_df) && "pairs" %in% names(pairs_df)) {
     pairs_df <- pairs_df$pairs
@@ -227,7 +227,7 @@ run_mutateR <- function(gene_id,
     if (!quiet) message("Detected intragenic assembly mode (≤2 exons).")
   }
 
-  ## ----- Step 7: Primer Design -----
+  ## ----- Step 7: Primer design -----
   if (design_primers && !is.null(pairs_df) && nrow(pairs_df) > 0) {
 
     # Check if we have any recommended pairs

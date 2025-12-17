@@ -79,7 +79,7 @@ activate_mutater_env <- function(envname = "r-mutater") {
     is_correct <- (curr_env == envname) || grepl(envname, curr_py, fixed = TRUE)
 
     if (!is_correct) {
-      warning("Reticulate is already initialized to a different environment: '", curr_env, "'.\n",
+      warning("Reticulate is already initialised to a different environment: '", curr_env, "'.\n",
               "Path: ", curr_py, "\n",
               "You must RESTART R to switch to '", envname, "'.")
       return(FALSE)

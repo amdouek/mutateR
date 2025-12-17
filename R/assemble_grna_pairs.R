@@ -4,7 +4,7 @@
 #' Automatically detects scoring method to apply appropriate cutoffs:
 #' - DeepCpf1 / DeepSpCas9: > 50 (linear regression on indel frequency)
 #' - RuleSet1 / Azimuth / enPAM+GB: > 0.5 (probability-like scores)
-#' - RuleSet3: > 0.1 (z-scored activity)
+#' - RuleSet3: > 0.1 (z-scores)
 #'
 #' @param grna_gr GRanges returned by \link{filter_valid_grnas}.
 #' @param exon_gr GRanges from \link{get_exon_structures}(output="GRanges").
@@ -32,10 +32,10 @@ assemble_grna_pairs <- function(grna_gr,
     # Regression models output raw indel percentages (0-100 scale)
     regression_models <- c("deepcpf1", "deepspcas9")
 
-    # Z-score models output standardized activity scores (centered ~0)
+    # Z-score models output standardised activity scores (centered ~0)
     zscore_models <- c("ruleset3")
 
-    # Probability-like models output normalized scores (~0-1 scale)
+    # Probability-like models output normalised scores (~0-1 scale)
     # Note: enpamgb can slightly exceed 1.0 (or be negative) due to unconstrained regression
     probability_models <- c("ruleset1", "azimuth", "deephf", "enpamgb")
 
@@ -60,7 +60,7 @@ assemble_grna_pairs <- function(grna_gr,
   }
   numeric_scores[is.nan(numeric_scores)] <- NA_real_
 
-  # ---- 3. Intragenic mode (≤2 Exons) --------------------------------
+  # ---- 3. Intragenic mode (≤2 exons) --------------------------------
   n_exons <- length(exon_gr)
   if (n_exons <= 2) {
     message("Single-exon/two-exon gene detected: constructing intragenic deletion pairs.")
@@ -128,7 +128,7 @@ assemble_grna_pairs <- function(grna_gr,
 
   domain_df <- tryCatch(map_protein_domains(transcript_id, species), error = \(e) NULL)
 
-  # Build Pairs
+  # Build pairs
   results <- list()
   for (i in seq_len(nrow(pair_info))) {
     e5 <- pair_info$target_5p[i]; e3 <- pair_info$target_3p[i]
@@ -156,7 +156,7 @@ assemble_grna_pairs <- function(grna_gr,
   if (!length(results)) return(NULL)
   out <- do.call(rbind, results)
 
-  # Technical Filter: Minimal deletion size & potential for steric hindrance
+  # Technical filter: Minimal deletion size & potential for steric hindrance
   # Deletions < 50 bp are hard to genotype by agarose gel
   # Cas effector footprint causing steric hindrance if two RNPs are too close to each other.
   out <- out[out$genomic_deletion_size > 50, ]
@@ -199,7 +199,7 @@ assemble_grna_pairs <- function(grna_gr,
                           !is.na(ontarget_score_5p) & ontarget_score_5p >= score_cutoff &
                             !is.na(ontarget_score_3p) & ontarget_score_3p >= score_cutoff)
 
-  # Keep Columns
+  # Keep columns
   keep_cols <- c("upstream_pair","downstream_pair","exon_5p","exon_3p",
                  "compatible","frameshift","ptc_flag","terminal_exon_case",
                  "genomic_deletion_size", "transcript_deletion_size",

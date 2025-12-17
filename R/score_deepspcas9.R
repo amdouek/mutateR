@@ -47,7 +47,7 @@ predict_deepspcas9_python <- function(sequence_context) {
   # One-hot encode (uses shared utility)
   encoded_data <- one_hot_encode_dna(sequence_context)
 
-  # --- 4. Define Python Architecture ---
+  # --- 4. Define Python architecture ---
   # Only define if not present in globals
   is_defined <- tryCatch({
     reticulate::py_eval("'build_and_predict_deepspcas9' in globals()")

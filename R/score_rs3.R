@@ -9,7 +9,7 @@
 #' @param sequence_context Character vector of 30 bp sequences
 #'        (4bp 5' flank + 20bp protospacer + 3bp PAM + 3bp 3' flank).
 #' @param tracr Character. tracrRNA scaffold: "Chen2013" (default) or "Hsu2013".
-#' @param n_jobs Integer. Parallel jobs for featurization (default 1).
+#' @param n_jobs Integer. Parallel jobs for featurisation (default 1).
 #'
 #' @return Numeric vector of RS3 Sequence scores.
 #'

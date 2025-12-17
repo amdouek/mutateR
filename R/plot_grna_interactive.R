@@ -93,7 +93,7 @@ plot_grna_interactive <- function(exon_gr,
                     formatC(score3p, digits = 3, format = 'f')), "")
     ))
 
-  ## ---- 5. Construct Matrices ----
+  ## ---- 5. Construct matrices ----
   merged <- merged[order(merged$exon_3p, merged$exon_5p), ]
 
   zmat      <- matrix(merged$CatNum, nrow = n_exons, ncol = n_exons, byrow = TRUE)

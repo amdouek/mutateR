@@ -27,7 +27,7 @@ score_grnas <- function(grna_gr,
     return(grna_gr)
   }
 
-  # ---- 2. Basic Validation ----------------------------------------
+  # ---- 2. Basic validation ----------------------------------------
   if (!inherits(grna_gr, "GRanges")) stop("Input must be a GRanges object.")
   if (!"sequence_context" %in% names(mcols(grna_gr))) stop("GRanges must contain 'sequence_context' column.")
 
@@ -50,7 +50,7 @@ score_grnas <- function(grna_gr,
 
   scores_raw <- NULL
 
-  # ---- 3. SpCas9 Models (Probability-based) -----------------------
+  # ---- 3. SpCas9 models (probability-based) -----------------------
   # Rule Set 1
   if (tolower(method) == "ruleset1") {
     if (!requireNamespace("crisprScore", quietly = TRUE)) stop("crisprScore required.")

@@ -1,8 +1,6 @@
 #' Internal function to run Primer3 via reticulate (Batch Mode)
 #'
 #' Defines and calls a Python function to design primer pairs for a batch of inputs.
-#' This offers orders-of-magnitude performance improvements over iterative calls
-#' by minimizing R-to-Python context switching.
 #'
 #' @param request_list List of named lists. Each element must contain:
 #'        sequence_template, target_start, target_len, tm_opt, prod_min, prod_max.
@@ -11,7 +9,7 @@
 #' @noRd
 run_primer3_batch <- function(request_list) {
 
-  # --- 1. Environment Checks ---
+  # --- 1. Environment checks ---
   if (!requireNamespace("reticulate", quietly = TRUE)) stop("reticulate missing")
   if (length(request_list) == 0) return(list())
 
@@ -21,7 +19,7 @@ run_primer3_batch <- function(request_list) {
     }
   }
 
-  # --- 2. Define Python Batch Function ---
+  # --- 2. Define Python batch function ---
   is_defined <- tryCatch({
     reticulate::py_eval("'design_primers_batch' in globals()")
   }, error = function(e) FALSE)
@@ -95,7 +93,7 @@ def design_primers_batch(request_list):
 ")
   }
 
-  # --- 3. Run Batch Inference ---
+  # --- 3. Run batch inference ---
   # reticulate automatically converts the R list of lists into a Python list of dicts
   results <- reticulate::py$design_primers_batch(request_list)
 

@@ -2,7 +2,7 @@
 #'
 #' Automatically designs PCR primers to genotype CRISPR-mediated deletions.
 #' Uses the primer3-py backend for thermodynamic accuracy.
-#' Optimized with batch processing to reduce R-Python overhead.
+#' Optimised with batch processing to reduce R-Python overhead.
 #'
 #' @param pairs_df Data frame returned by \code{assemble_grna_pairs}.
 #' @param exons_gr GRanges object of exon structures.
@@ -60,7 +60,7 @@ get_genotyping_primers <- function(pairs_df,
   size_wt    <- rep(NA_character_, n_total); size_mut <- rep(NA_integer_, n_total)
   size_int   <- rep(NA_integer_, n_total)
 
-  # --- Helper: Safe Sequence Fetching ---
+  # --- Helper: Safe sequence fetching ---
   safe_get_seq <- function(...) {
     val <- tryCatch(as.character(Biostrings::getSeq(...)), error = function(e) "")
     if (length(val) == 0) return("")
@@ -82,7 +82,7 @@ get_genotyping_primers <- function(pairs_df,
     use_strat_b <- del_size > max_wt_amplicon
 
     if (!use_strat_b) {
-      # ---- Strategy A: Flanking Pair ----
+      # ---- Strategy A: Flanking pair ----
       strategies[i] <- "Flanking"
 
       tmpl_start <- max(1, cut_s - padding)
@@ -110,11 +110,11 @@ get_genotyping_primers <- function(pairs_df,
       }
 
     } else {
-      # ---- Strategy B: Dual Pair ----
+      # ---- Strategy B: Dual pair ----
       strategies[i] <- "Dual_Pair"
       size_wt[i] <- "Too Large"
 
-      # -- B1. External Pair (Mutant Detection) --
+      # -- B1. External pair (mutant detection) --
       up_seq <- safe_get_seq(genome, names=chrom, start=cut_s-400, end=cut_s)
       dn_seq <- safe_get_seq(genome, names=chrom, start=cut_e, end=cut_e+400)
 
@@ -136,7 +136,7 @@ get_genotyping_primers <- function(pairs_df,
         )
       }
 
-      # -- B2. Internal Pair (WT Detection) --
+      # -- B2. Internal pair (WT detection) --
       e5_rank <- pairs_df$exon_5p[i]; e3_rank <- pairs_df$exon_3p[i]
       cache_key <- paste(e5_rank, e3_rank, sep="_")
 
@@ -198,7 +198,7 @@ get_genotyping_primers <- function(pairs_df,
   }
   close(pb)
 
-  # --- PHASE 2: Execute Batch in Python ---
+  # --- PHASE 2: Execute batch in Python ---
   if (length(batch_requests) > 0) {
     message("Running Batch Primer3 (", length(batch_requests), " designs)...")
     batch_results <- tryCatch({
@@ -211,7 +211,7 @@ get_genotyping_primers <- function(pairs_df,
     batch_results <- NULL
   }
 
-  # --- PHASE 3: Process Results ---
+  # --- PHASE 3: Process results ---
   if (!is.null(batch_results)) {
     message("Mapping results to dataframe...")
 
