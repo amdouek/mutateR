@@ -1,6 +1,6 @@
 #' On-target scoring for gRNAs
 #'
-#' Currently handles RuleSet1 and Azimuth (Cas9), DeepSpCas9 (Cas9), RuleSet 3 (Cas9) and DeepCpf1 (Cas12a).
+#' Currently handles RuleSet1 and Azimuth (Cas9), DeepSpCas9 (Cas9), RuleSet 3 (Cas9),  DeepCpf1 (Cas12a), and enPAM+GB (Cas12a/enCas12a).
 #' Automatically routes deep learning methods to the internal Python backend on Windows (requires miniconda and separate env install, see [install_mutater_env()].
 #'
 #' @param grna_gr GRanges returned by find_cas9_sites() or find_cas12a_sites().
@@ -18,7 +18,7 @@ score_grnas <- function(grna_gr,
   os_is_windows <- identical(.Platform$OS.type, "windows")
 
   # ---- 1. Unsupported models on Windows ----
-  unsupported_windows <- c("deephf", "enpamgb")
+  unsupported_windows <- c("deephf")
 
   if (os_is_windows && tolower(method) %in% unsupported_windows) {
     warning("The ", method, " model is not supported on Windows. Returning NA scores.")
@@ -161,6 +161,23 @@ score_grnas <- function(grna_gr,
         return(rep(NA_real_, length(seqs)))
       })
     }
+  }
+
+  # enPAM+GB (via Python backend - sklearn-based)
+  if (tolower(method) == "enpamgb") {
+    message("Using mutateR internal Python backend for enPAM+GB...")
+
+    if (!check_mutater_env()) {
+      warning("Python environment not ready. Running install_mutater_env()...")
+      install_mutater_env()
+    }
+
+    scores_raw <- tryCatch({
+      predict_enpamgb_python(seqs)
+    }, error = function(e) {
+      warning("enPAM+GB inference failed: ", e$message)
+      return(rep(NA_real_, length(seqs)))
+    })
   }
 
   # ---- 7. Final Formatting ----------------------------------------

@@ -30,7 +30,8 @@ A \code{data.frame} of candidate exon‑flanking gRNA pairs.
 Merges gRNAs for phase-compatible exon pairs.
 Automatically detects scoring method to apply appropriate cutoffs:
 \itemize{
-\item DeepCpf1 / DeepSpCas9: > 50
-\item RuleSet1 / Azimuth: > 0.5
+\item DeepCpf1 / DeepSpCas9: > 50 (linear regression on indel frequency)
+\item RuleSet1 / Azimuth / enPAM+GB: > 0.5 (probability-like scores)
+\item RuleSet3: > 0.1 (z-scored activity)
 }
 }

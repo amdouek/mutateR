@@ -2,12 +2,13 @@
 #'
 #' Returns scored Cas9 gRNAs that lie within exons
 #' participating in phase‑compatible exon pairs or predicted
-#' terminal‑exon frameshift cases (permitted PTC deletions).
+#' terminal‑exon PTC cases.
 #'
 #' @param exon_gr  GRanges from get_exon_structures(output="GRanges").
 #' @param genome   BSgenome object for the relevant species.
 #' @param species  Character, e.g. "hsapiens".
-#' @param score_method Character. One of "ruleset1", "azimuth", "deepspcas9", "deephf", "ruleset3 (Cas9) or "deepcpf1" (Cas12a).
+#' @param nuclease Character. One of "Cas9", "Cas12a" or "enCas12a".
+#' @param score_method Character. One of "ruleset1", "azimuth", "deepspcas9", "deephf", "ruleset3 (Cas9), "deepcpf1" (Cas12a), or "enpamgb" (enCas12a).
 #' @param scored_grnas Precomputed on-target scores passed from elsewhere (default NULL, evokes scoring).
 #' @param tracr Character, either "Chen2013" (default) or "Hsu2013" - only for ruleset3 scoring.
 #'
@@ -16,29 +17,47 @@
 filter_valid_grnas <- function(exon_gr,
                                genome,
                                species,
-                               score_method = c("ruleset1","azimuth","deephf","deepcpf1","deepspcas9","ruleset3"),
+                               nuclease = c("Cas9", "Cas12a", "enCas12a"),
+                               score_method = c("ruleset1","azimuth","deephf","deepcpf1","deepspcas9","ruleset3","enpamgb"),
                                scored_grnas = NULL,
                                tracr = "Chen2013") {
-
+  nuclease = match.arg(nuclease)
   score_method <- match.arg(score_method)
+
+  # ---- Validate nuclease/score_method compatibility ----
+  cas9_methods <- c("ruleset1", "azimuth", "deephf", "deepspcas9", "ruleset3")
+  cas12a_methods <- c("deepcpf1")
+  encas12a_methods <- c("enpamgb")
+
+
+  if (nuclease == "Cas9" && !score_method %in% cas9_methods) {
+    warning("Score method '", score_method, "' is not designed for Cas9. ",
+            "Consider using one of: ", paste(cas9_methods, collapse = ", "))
+  } else if (nuclease == "Cas12a" && !score_method %in% c(cas12a_methods, encas12a_methods)) {
+    warning("Score method '", score_method, "' is not designed for Cas12a. ",
+            "Consider using one of: ", paste(cas12a_methods, collapse = ", "))
+  } else if (nuclease == "enCas12a" && !score_method %in% encas12a_methods) {
+    warning("Score method '", score_method, "' is not optimised for enCas12a. ",
+            "Consider using: ", paste(encas12a_methods, collapse = ", "))
+  }
 
   ## ---- 0. Early‑exit for single‑exon and two‑exon transcripts ----------
   n_exons <- length(exon_gr)
   if (n_exons <= 2) {
     warning("Transcript has ", n_exons, " exon(s). Skipping phase‑compatibility checks.")
 
-    # Branch based on method to determine nuclease
-    if (score_method == "deepcpf1") {
-      grna_sites <- find_cas12a_sites(exon_gr, genome)
-    } else {
-      grna_sites <- find_cas9_sites(exon_gr, genome)
-    }
+    # Find sites based on nuclease
+    grna_sites <- switch(nuclease,
+                         "Cas9" = find_cas9_sites(exon_gr, genome),
+                         "Cas12a" = find_cas12a_sites(exon_gr, genome, pam = "TTTV"),
+                         "enCas12a" = find_cas12a_sites(exon_gr, genome, pam = "TTTN")
+    )
 
     if (is.null(grna_sites) || length(grna_sites) == 0) {
       warning("No target sites found.")
       return(NULL)
     }
-    grna_sites <- score_grnas(grna_sites, method = score_method)
+    grna_sites <- score_grnas(grna_sites, method = score_method, tracr = tracr)
     return(grna_sites)
   }
 
@@ -70,12 +89,12 @@ filter_valid_grnas <- function(exon_gr,
     # Use pre-scored gRNAs if provided
     grna_sites <- scored_grnas
   } else {
-    # Otherwise, find and score (legacy behaviour)
-    if (score_method == "deepcpf1") {
-      grna_sites <- find_cas12a_sites(exon_gr, genome)
-    } else {
-      grna_sites <- find_cas9_sites(exon_gr, genome)
-    }
+    # Find sites based on nuclease
+    grna_sites <- switch(nuclease,
+                         "Cas9" = find_cas9_sites(exon_gr, genome),
+                         "Cas12a" = find_cas12a_sites(exon_gr, genome, pam = "TTTV"),
+                         "enCas12a" = find_cas12a_sites(exon_gr, genome, pam = "TTTN")
+    )
 
     if (is.null(grna_sites) || length(grna_sites) == 0) {
       warning("No sites found within provided exons.")

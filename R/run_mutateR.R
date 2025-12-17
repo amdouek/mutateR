@@ -3,7 +3,7 @@
 #' Executes all major steps of the mutateR pipeline end‑to‑end:
 #' 1. Gene/Transcript retrieval
 #' 2. Exon phase mapping
-#' 3. gRNA finding & scoring (Cas9 or Cas12a)
+#' 3. gRNA finding & scoring (Cas9, Cas12a, or enCas12a)
 #' 4. Exon-deletion pair assembly (Auto-detects scoring thresholds unless overridden)
 #' 5. Genotyping primer design (Runs only on recommended pairs)
 #' 6. Visualisation
@@ -11,13 +11,18 @@
 #' @param gene_id Character. Gene symbol or Ensembl Gene ID (ENSG...).
 #' @param species Character. e.g. "hsapiens", "mmusculus", "drerio".
 #' @param genome  BSgenome object (e.g. BSgenome.Hsapiens.UCSC.hg38).
-#' @param nuclease Character. One of "Cas9" or "Cas12a" (default "Cas9").
+#' @param nuclease Character. One of "Cas9" (NGG PAM), "Cas12a" (TTTV PAM), or "enCas12a" (TTTN PAM). Defaults to "Cas9".
 #' @param transcript_id Optional Ensembl transcript ID to override canonical.
-#' @param score_method Character. On‑target scoring model:
-#'        Cas9: "ruleset1", "azimuth", "deephf", "deepspcas9", "ruleset3";  Cas12a: "deepcpf1".
+#' @param score_method Character. On‑target scoring model. If NULL (default), autoselects:
+#'        - Cas9: "ruleset1" (alternatives: "azimuth", "deephf", "deepspcas9", "ruleset3")
+#'        - Cas12a: "deepcpf1"
+#'        - enCas12a: "enpamgb"
 #' @param tracr Character. For Rule Set 3 scoring - one of "Chen2013" (default) or "Hsu2013".
 #' @param min_score Numeric. Optional override for on-target score cutoff.
-#'        If NULL (default), auto-selects (0.5 for Cas9 models, 50 for DeepCpf1).
+#'        If NULL (default), auto-selects based on scoring method:
+#'        - DeepCpf1/DeepSpCas9: 50 (percentage scale)
+#'        - RuleSet1/Azimuth/enPAM+GB: 0.5 (probability-like scale)
+#'        - RuleSet3: 0.1 (z-score scale)
 #' @param design_primers Logical. Whether to design genotyping primers (default TRUE).
 #' @param primer_max_wt Integer. Max WT amplicon size before switching to dual-pair strategy (default 3000).
 #' @param primer_tm Numeric. Target melting temperature for primers (default 60.0).
@@ -27,17 +32,49 @@
 #' @param interactive Logical; default FALSE. Use interactive plotly-based viewer.
 #'
 #' @return A named list with elements:
+#'   - gene_id
+#'   - gene_symbol
 #'   - transcript_id
+#'   - nuclease
 #'   - exons (GRanges)
 #'   - scored_grnas (GRanges)
 #'   - pairs (data.frame with gRNAs and primers)
 #'   - plot (ggplot or plotly object)
 #'
+#' @examples
+#' \dontrun{
+#' library(BSgenome.Hsapiens.UCSC.hg38)
+#'
+#' # Cas9 workflow (default)
+#' result_cas9 <- run_mutateR(
+#'   gene_id = "TP53",
+#'   species = "hsapiens",
+#'   genome = BSgenome.Hsapiens.UCSC.hg38,
+#'   nuclease = "Cas9"
+#' )
+#'
+#' # Wild-type Cas12a workflow
+#' result_cas12a <- run_mutateR(
+#'   gene_id = "TP53",
+#'   species = "hsapiens",
+#'   genome = BSgenome.Hsapiens.UCSC.hg38,
+#'   nuclease = "Cas12a"
+#' )
+#'
+#' # Engineered enCas12a workflow (expanded PAM)
+#' result_encas12a <- run_mutateR(
+#'   gene_id = "TP53",
+#'   species = "hsapiens",
+#'   genome = BSgenome.Hsapiens.UCSC.hg38,
+#'   nuclease = "enCas12a"
+#' )
+#' }
+#'
 #' @export
 run_mutateR <- function(gene_id,
                         species,
                         genome,
-                        nuclease = c("Cas9", "Cas12a"),
+                        nuclease = c("Cas9", "Cas12a", "enCas12a"),
                         transcript_id = NULL,
                         score_method = NULL,
                         tracr = "Chen2013",
@@ -61,8 +98,14 @@ run_mutateR <- function(gene_id,
   if (!inherits(genome, "BSgenome"))
     stop("Please supply a valid BSgenome object.")
 
+  # ---- Set default scoring method based on nuclease ----
   if (is.null(score_method)) {
-    score_method <- if (nuclease == "Cas9") "ruleset1" else "deepcpf1" # Need to amend now that DeepSpCas9 is implemented.
+    score_method <- switch(nuclease,
+                           "Cas9" = "ruleset1",
+                           "Cas12a" = "deepcpf1",
+                           "enCas12a" = "enpamgb"
+    )
+    if (!quiet) message("Auto-selected scoring method '", score_method, "' for ", nuclease)
   }
 
   ## ----- Step 1: Gene Info -----
@@ -99,17 +142,27 @@ run_mutateR <- function(gene_id,
   }
 
   ## ----- Step 3: Find gRNAs -----
-  if (!quiet) message("Locating ", nuclease, " target sites...")
-  if (nuclease == "Cas9")
-    hits <- find_cas9_sites(exons_gr, genome)
-  else
-    hits <- find_cas12a_sites(exons_gr, genome)
+  if (!quiet) {
+    pam_info <- switch(nuclease,
+                       "Cas9" = "NGG",
+                       "Cas12a" = "TTTV",
+                       "enCas12a" = "TTTN"
+    )
+    message("Locating ", nuclease, " target sites (PAM: ", pam_info, ")...")
+  }
+
+  hits <- switch(nuclease,
+                 "Cas9" = find_cas9_sites(exons_gr, genome),
+                 "Cas12a" = find_cas12a_sites(exons_gr, genome, pam = "TTTV"),
+                 "enCas12a" = find_cas12a_sites(exons_gr, genome, pam = "TTTN")
+  )
 
   if (is.null(hits) || length(hits) == 0) {
     warning("No gRNA sites identified for ", gene_id, " / ", nuclease)
     return(list(gene_id = gene_id,
                 gene_symbol = gene_symbol,
                 transcript_id = canonical_tx,
+                nuclease = nuclease,
                 exons = exons_gr,
                 scored_grnas = NULL,
                 pairs = data.frame(),
@@ -144,7 +197,9 @@ run_mutateR <- function(gene_id,
   valid_grnas <- suppressMessages({
     suppressWarnings({
       tmp <- capture.output(
-        val <- filter_valid_grnas(exons_gr, genome, species, score_method,
+        val <- filter_valid_grnas(exons_gr, genome, species,
+                                  nuclease = nuclease,
+                                  score_method = score_method,
                                   scored_grnas = scored_grnas,
                                   tracr = tracr)
       )
@@ -238,13 +293,14 @@ run_mutateR <- function(gene_id,
 
   ## ----- Step 9: Return -----
   if (!quiet) message("mutateR pipeline completed for ", gene_id,
-                      ", finding ",
+                      " (", nuclease, "), finding ",
                       ifelse(is.null(pairs_df), 0, nrow(pairs_df)),
                       " gRNA pairs.")
   return(list(
     gene_id = gene_id,
     gene_symbol = gene_symbol,
     transcript_id = canonical_tx,
+    nuclease = nuclease,
     exons = exons_gr,
     scored_grnas = scored_grnas,
     pairs = pairs_df,

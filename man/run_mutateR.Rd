@@ -8,7 +8,7 @@ run_mutateR(
   gene_id,
   species,
   genome,
-  nuclease = c("Cas9", "Cas12a"),
+  nuclease = c("Cas9", "Cas12a", "enCas12a"),
   transcript_id = NULL,
   score_method = NULL,
   tracr = "Chen2013",
@@ -29,17 +29,22 @@ run_mutateR(
 
 \item{genome}{BSgenome object (e.g. BSgenome.Hsapiens.UCSC.hg38).}
 
-\item{nuclease}{Character. One of "Cas9" or "Cas12a" (default "Cas9").}
+\item{nuclease}{Character. One of "Cas9" (NGG PAM), "Cas12a" (TTTV PAM), or "enCas12a" (TTTN PAM). Defaults to "Cas9".}
 
 \item{transcript_id}{Optional Ensembl transcript ID to override canonical.}
 
-\item{score_method}{Character. On‑target scoring model:
-Cas9: "ruleset1", "azimuth", "deephf", "deepspcas9", "ruleset3";  Cas12a: "deepcpf1".}
+\item{score_method}{Character. On‑target scoring model. If NULL (default), autoselects:
+- Cas9: "ruleset1" (alternatives: "azimuth", "deephf", "deepspcas9", "ruleset3")
+- Cas12a: "deepcpf1"
+- enCas12a: "enpamgb"}
 
 \item{tracr}{Character. For Rule Set 3 scoring - one of "Chen2013" (default) or "Hsu2013".}
 
 \item{min_score}{Numeric. Optional override for on-target score cutoff.
-If NULL (default), auto-selects (0.5 for Cas9 models, 50 for DeepCpf1).}
+If NULL (default), auto-selects based on scoring method:
+- DeepCpf1/DeepSpCas9: 50 (percentage scale)
+- RuleSet1/Azimuth/enPAM+GB: 0.5 (probability-like scale)
+- RuleSet3: 0.1 (z-score scale)}
 
 \item{design_primers}{Logical. Whether to design genotyping primers (default TRUE).}
 
@@ -58,7 +63,10 @@ If NULL (default), auto-selects (0.5 for Cas9 models, 50 for DeepCpf1).}
 \value{
 A named list with elements:
 \itemize{
+\item gene_id
+\item gene_symbol
 \item transcript_id
+\item nuclease
 \item exons (GRanges)
 \item scored_grnas (GRanges)
 \item pairs (data.frame with gRNAs and primers)
@@ -70,9 +78,39 @@ Executes all major steps of the mutateR pipeline end‑to‑end:
 \enumerate{
 \item Gene/Transcript retrieval
 \item Exon phase mapping
-\item gRNA finding & scoring (Cas9 or Cas12a)
+\item gRNA finding & scoring (Cas9, Cas12a, or enCas12a)
 \item Exon-deletion pair assembly (Auto-detects scoring thresholds unless overridden)
 \item Genotyping primer design (Runs only on recommended pairs)
 \item Visualisation
 }
+}
+\examples{
+\dontrun{
+library(BSgenome.Hsapiens.UCSC.hg38)
+
+# Cas9 workflow (default)
+result_cas9 <- run_mutateR(
+  gene_id = "TP53",
+  species = "hsapiens",
+  genome = BSgenome.Hsapiens.UCSC.hg38,
+  nuclease = "Cas9"
+)
+
+# Wild-type Cas12a workflow
+result_cas12a <- run_mutateR(
+  gene_id = "TP53",
+  species = "hsapiens",
+  genome = BSgenome.Hsapiens.UCSC.hg38,
+  nuclease = "Cas12a"
+)
+
+# Engineered enCas12a workflow (expanded PAM)
+result_encas12a <- run_mutateR(
+  gene_id = "TP53",
+  species = "hsapiens",
+  genome = BSgenome.Hsapiens.UCSC.hg38,
+  nuclease = "enCas12a"
+)
+}
+
 }

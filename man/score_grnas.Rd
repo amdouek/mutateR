@@ -22,6 +22,6 @@ score_grnas(
 GRanges with added metadata columns \code{ontarget_score} and \code{scoring_method}.
 }
 \description{
-Currently handles RuleSet1 and Azimuth (Cas9), DeepSpCas9 (Cas9), RuleSet 3 (Cas9) and DeepCpf1 (Cas12a).
+Currently handles RuleSet1 and Azimuth (Cas9), DeepSpCas9 (Cas9), RuleSet 3 (Cas9),  DeepCpf1 (Cas12a), and enPAM+GB (Cas12a/enCas12a).
 Automatically routes deep learning methods to the internal Python backend on Windows (requires miniconda and separate env install, see \code{\link[=install_mutater_env]{install_mutater_env()}}.
 }

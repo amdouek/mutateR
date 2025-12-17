@@ -8,7 +8,9 @@ filter_valid_grnas(
   exon_gr,
   genome,
   species,
-  score_method = c("ruleset1", "azimuth", "deephf", "deepcpf1", "deepspcas9", "ruleset3"),
+  nuclease = c("Cas9", "Cas12a", "enCas12a"),
+  score_method = c("ruleset1", "azimuth", "deephf", "deepcpf1", "deepspcas9", "ruleset3",
+    "enpamgb"),
   scored_grnas = NULL,
   tracr = "Chen2013"
 )
@@ -20,7 +22,9 @@ filter_valid_grnas(
 
 \item{species}{Character, e.g. "hsapiens".}
 
-\item{score_method}{Character. One of "ruleset1", "azimuth", "deepspcas9", "deephf", "ruleset3 (Cas9) or "deepcpf1" (Cas12a).}
+\item{nuclease}{Character. One of "Cas9", "Cas12a" or "enCas12a".}
+
+\item{score_method}{Character. One of "ruleset1", "azimuth", "deepspcas9", "deephf", "ruleset3 (Cas9), "deepcpf1" (Cas12a), or "enpamgb" (enCas12a).}
 
 \item{scored_grnas}{Precomputed on-target scores passed from elsewhere (default NULL, evokes scoring).}
 
@@ -32,5 +36,5 @@ GRanges of scored, biologically admissible gRNAs.
 \description{
 Returns scored Cas9 gRNAs that lie within exons
 participating in phase‑compatible exon pairs or predicted
-terminal‑exon frameshift cases (permitted PTC deletions).
+terminal‑exon PTC cases.
 }

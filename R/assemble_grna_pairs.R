@@ -2,8 +2,9 @@
 #'
 #' Merges gRNAs for phase-compatible exon pairs.
 #' Automatically detects scoring method to apply appropriate cutoffs:
-#' - DeepCpf1 / DeepSpCas9: > 50
-#' - RuleSet1 / Azimuth: > 0.5
+#' - DeepCpf1 / DeepSpCas9: > 50 (linear regression on indel frequency)
+#' - RuleSet1 / Azimuth / enPAM+GB: > 0.5 (probability-like scores)
+#' - RuleSet3: > 0.1 (z-scored activity)
 #'
 #' @param grna_gr GRanges returned by \link{filter_valid_grnas}.
 #' @param exon_gr GRanges from \link{get_exon_structures}(output="GRanges").
@@ -22,14 +23,21 @@ assemble_grna_pairs <- function(grna_gr,
   stopifnot(inherits(grna_gr, "GRanges"))
   message("Assembling gRNA pairs for exon‑flanking deletions...")
 
-  # ---- 1. Determine Score Cutoff ------------------------------------
+  # ---- 1. Determine score cutoff ------------------------------------
   if (is.null(score_cutoff)) {
     # Check metadata for scoring method
     method <- if ("scoring_method" %in% names(mcols(grna_gr))) unique(mcols(grna_gr)$scoring_method)[1] else "ruleset1"
 
     # Define model categories by output type
+    # Regression models output raw indel percentages (0-100 scale)
     regression_models <- c("deepcpf1", "deepspcas9")
+
+    # Z-score models output standardized activity scores (centered ~0)
     zscore_models <- c("ruleset3")
+
+    # Probability-like models output normalized scores (~0-1 scale)
+    # Note: enpamgb can slightly exceed 1.0 (or be negative) due to unconstrained regression
+    probability_models <- c("ruleset1", "azimuth", "deephf", "enpamgb")
 
     if (!is.na(method) && tolower(method) %in% regression_models) {
       score_cutoff <- 50
@@ -39,7 +47,7 @@ assemble_grna_pairs <- function(grna_gr,
       message("Detected z-scored activity model (", method, "). Using default cutoff: ", score_cutoff)
     } else {
       score_cutoff <- 0.5
-      message("Detected probability-based scores (e.g. ", method, "). Using default cutoff: ", score_cutoff)
+      message("Detected probability-like scores (", method, "). Using default cutoff: ", score_cutoff)
     }
   }
 
@@ -52,7 +60,7 @@ assemble_grna_pairs <- function(grna_gr,
   }
   numeric_scores[is.nan(numeric_scores)] <- NA_real_
 
-  # ---- 3. Intragenic Mode (≤2 Exons) --------------------------------
+  # ---- 3. Intragenic mode (≤2 Exons) --------------------------------
   n_exons <- length(exon_gr)
   if (n_exons <= 2) {
     message("Single-exon/two-exon gene detected: constructing intragenic deletion pairs.")
@@ -88,7 +96,7 @@ assemble_grna_pairs <- function(grna_gr,
     return(list(pairs = intragenic[intragenic$recommended == TRUE, ], intragenic_mode = TRUE))
   }
 
-  # ---- 4. Multi-Exon Logic ------------------------------------------
+  # ---- 4. Multi-exon logic ------------------------------------------
   exon_meta <- as.data.frame(mcols(exon_gr))
   exon_meta$rank <- seq_len(nrow(exon_meta))
   comp_pairs <- check_exon_phase(exon_meta, include_contiguous = FALSE)
@@ -96,7 +104,7 @@ assemble_grna_pairs <- function(grna_gr,
 
   if (nrow(comp_pairs) == 0) return(NULL)
 
-  # Check Frame
+  # Check frame
   fs_list <- lapply(seq_len(nrow(comp_pairs)), function(i)
     with(comp_pairs[i, ], check_frameshift_ptc(exon_meta, exon_5p, exon_3p)))
   fs_df <- do.call(rbind, lapply(fs_list, as.data.frame))
@@ -150,13 +158,12 @@ assemble_grna_pairs <- function(grna_gr,
 
   # Technical Filter: Minimal deletion size & potential for steric hindrance
   # Deletions < 50 bp are hard to genotype by agarose gel
-  # Cas effector footprint causing steric hindrance if two RNPs are too close to each other. (Not sure of exact footprint size, but 50 nt between cut sites should probably suffice - check literature).
-  out <- out[out$genomic_deletion_size > 50, ] # Applied 50 bp floor for expected genomic deletion
+  # Cas effector footprint causing steric hindrance if two RNPs are too close to each other.
+  out <- out[out$genomic_deletion_size > 50, ]
 
   if (nrow(out) > 0) {
-    # Biological filter: Residual Exon Mass (REM) ***MAKE SURE TO DOCUMENT THIS LOGIC***
+    # Biological filter: Residual Exon Mass (REM)
     # For single-exon targets, ensure the exon is effectively destroyed/skipped.
-    # If a large exon remains mostly intact, the spliceosome will likely include it (causing an internal deletion/frameshift rather than the desired exon skipping).
 
     # Extract exon widths using the rank metadata
     ex_widths <- setNames(width(exon_gr), mcols(exon_gr)$rank)
@@ -174,12 +181,11 @@ assemble_grna_pairs <- function(grna_gr,
       destruction_ratio <- del_s / target_w
 
       # Criteria for keeping single-exon targets:
-      # A. Residual fragment is too small for spliceosome recognition for incorporation into mature mRNA (< 50 bp)
-      # B. The deletion destroys the vast majority of the exon (> 70%), likely destabilizing ESEs
+      # A. Residual fragment is too small for spliceosome recognition (< 50 bp)
+      # B. The deletion destroys the vast majority of the exon (> 70%)
       biologically_valid <- (residual_len < 50) | (destruction_ratio > 0.70)
 
-      # Keep if: (It is a multi-exon deletion) OR (it passes the biological check)
-      # Note: Multi-exon deletions (e.g. cutting E4 and E6) are always kept because they remove the intervening introns/splice-sites.
+      # Keep if: multi-exon deletion OR passes biological check
       to_keep <- (!is_single_ex) | biologically_valid
 
       out <- out[to_keep, ]
