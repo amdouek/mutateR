@@ -18,10 +18,13 @@
 #'        - Cas12a: "deepcpf1"
 #'        - enCas12a: "enpamgb"
 #' @param tracr Character. For Rule Set 3 scoring - one of "Chen2013" (default) or "Hsu2013".
+#' @param deephf_var Character. For DeepHF scoring - one of "wt", "wt_u6" (default), "wt_t7", "esp", or "hf".
+#'                See \code{\link{recommend_deephf_model}} for guidance on model selection based on
+#'                experimental design (delivery method, Cas9 variant).
 #' @param min_score Numeric. Optional override for on-target score cutoff.
 #'        If NULL (default), auto-selects based on scoring method:
 #'        - DeepCpf1/DeepSpCas9: 50 (percentage scale)
-#'        - RuleSet1/Azimuth/enPAM+GB: 0.5 (probability-like scale)
+#'        - RuleSet1/Azimuth/enPAM+GB/DeepHF: 0.5 (probability-like scale)
 #'        - RuleSet3: 0.1 (z-score scale)
 #' @param design_primers Logical. Whether to design genotyping primers (default TRUE).
 #' @param primer_max_wt Integer. Max WT amplicon size before switching to dual-pair strategy (default 3000).
@@ -45,16 +48,46 @@
 #' \dontrun{
 #' library(BSgenome.Hsapiens.UCSC.hg38)
 #'
-#' # Cas9 workflow (default)
-#' result_cas9 <- run_mutateR(
+#' # Cas9 workflow (default scoring: RuleSet1)
+#' TP53_cas9 <- run_mutateR(
 #'   gene_id = "TP53",
 #'   species = "hsapiens",
 #'   genome = BSgenome.Hsapiens.UCSC.hg38,
 #'   nuclease = "Cas9"
 #' )
 #'
+#' # Cas9 workflow with DeepHF scoring (U6 promoter context)
+#' TP53_deephf <- run_mutateR(
+#'   gene_id = "TP53",
+#'   species = "hsapiens",
+#'   genome = BSgenome.Hsapiens.UCSC.hg38,
+#'   nuclease = "Cas9",
+#'   score_method = "deephf",
+#'   deephf_var = "wt_u6"
+#' )
+#'
+#' # Cas9 workflow with DeepHF for RNP delivery (T7/synthetic gRNA)
+#' TP53_deephf_rnp <- run_mutateR(
+#'   gene_id = "TP53",
+#'   species = "hsapiens",
+#'   genome = BSgenome.Hsapiens.UCSC.hg38,
+#'   nuclease = "Cas9",
+#'   score_method = "deephf",
+#'   deephf_var = "wt_t7"
+#' )
+#'
+#' # Cas9 workflow with DeepHF for eSpCas9(1.1)
+#' TP53_espcas9 <- run_mutateR(
+#'   gene_id = "TP53",
+#'   species = "hsapiens",
+#'   genome = BSgenome.Hsapiens.UCSC.hg38,
+#'   nuclease = "Cas9",
+#'   score_method = "deephf",
+#'   deephf_var = "esp"
+#' )
+#'
 #' # Wild-type Cas12a workflow
-#' result_cas12a <- run_mutateR(
+#' TP53_cas12a <- run_mutateR(
 #'   gene_id = "TP53",
 #'   species = "hsapiens",
 #'   genome = BSgenome.Hsapiens.UCSC.hg38,
@@ -62,7 +95,7 @@
 #' )
 #'
 #' # Engineered enCas12a workflow (expanded PAM)
-#' result_encas12a <- run_mutateR(
+#' TP53_encas12a <- run_mutateR(
 #'   gene_id = "TP53",
 #'   species = "hsapiens",
 #'   genome = BSgenome.Hsapiens.UCSC.hg38,
@@ -78,6 +111,7 @@ run_mutateR <- function(gene_id,
                         transcript_id = NULL,
                         score_method = NULL,
                         tracr = "Chen2013",
+                        deephf_var = c("wt_u6", "wt_t7", "wt", "esp", "hf"),
                         min_score = NULL,
                         design_primers = TRUE,
                         primer_max_wt = 3000,
@@ -94,6 +128,7 @@ run_mutateR <- function(gene_id,
 
   plot_mode <- match.arg(plot_mode)
   nuclease <- match.arg(nuclease)
+  deephf_var <- match.arg(deephf_var)
 
   if (!inherits(genome, "BSgenome"))
     stop("Please supply a valid BSgenome object.")
@@ -106,6 +141,12 @@ run_mutateR <- function(gene_id,
                            "enCas12a" = "enpamgb"
     )
     if (!quiet) message("Auto-selected scoring method '", score_method, "' for ", nuclease)
+  }
+
+  # ---- Validate DeepHF variant parameter usage ----
+  if (score_method != "deephf" && deephf_var != "wt_u6") {
+    # User explicitly set deephf variant but isn't using DeepHF
+    if (!quiet) message("Note: 'deephf_var' parameter is only used with score_method='deephf'. Ignoring.")
   }
 
   ## ----- Step 1: Gene info -----
@@ -181,14 +222,22 @@ run_mutateR <- function(gene_id,
     msg <- paste0("Scoring gRNAs using model: ", score_method)
     if (score_method == "ruleset3") {
       msg <- paste0(msg, " (tracrRNA: ", tracr, ")")
+    } else if (score_method == "deephf") {
+      msg <- paste0(msg, " (variant: ", deephf_var, ")")
     }
     message(msg)
   }
 
   if (quiet) {
-    suppressMessages({scored_grnas <- score_grnas(hits, method = score_method)})
+    suppressMessages({scored_grnas <- score_grnas(hits,
+                                                  method = score_method,
+                                                  tracr = tracr,
+                                                  deephf_var = deephf_var)})
   } else {
-    scored_grnas <- score_grnas(hits, method = score_method, tracr = tracr)
+    scored_grnas <- score_grnas(hits,
+                                method = score_method,
+                                tracr = tracr,
+                                deephf_var = deephf_var)
   }
 
   ## ----- Step 5: Assembly -----
@@ -201,7 +250,8 @@ run_mutateR <- function(gene_id,
                                   nuclease = nuclease,
                                   score_method = score_method,
                                   scored_grnas = scored_grnas,
-                                  tracr = tracr)
+                                  tracr = tracr,
+                                  deephf_var = deephf_var)
       )
       val
     })
@@ -292,8 +342,10 @@ run_mutateR <- function(gene_id,
   })
 
   ## ----- Step 9: Return -----
-  if (!quiet) message("mutateR pipeline completed for ", gene_id,
-                      " (", nuclease, "), finding ",
+   if (!quiet) message("mutateR pipeline completed for ", gene_id,
+                      " (", nuclease, "/", score_method,
+                      if (score_method == "deephf") paste0("/", deephf_var) else "",
+                      "), finding ",
                       ifelse(is.null(pairs_df), 0, nrow(pairs_df)),
                       " gRNA pairs.")
   return(list(
@@ -301,6 +353,8 @@ run_mutateR <- function(gene_id,
     gene_symbol = gene_symbol,
     transcript_id = canonical_tx,
     nuclease = nuclease,
+    score_method = score_method,
+    deephf_var = if (score_method == "deephf") deephf_var else NA_character_,
     exons = exons_gr,
     scored_grnas = scored_grnas,
     pairs = pairs_df,

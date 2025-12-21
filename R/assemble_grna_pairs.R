@@ -37,7 +37,7 @@ assemble_grna_pairs <- function(grna_gr,
 
     # Probability-like models output normalised scores (~0-1 scale)
     # Note: enpamgb can slightly exceed 1.0 (or be negative) due to unconstrained regression
-    probability_models <- c("ruleset1", "azimuth", "deephf", "enpamgb")
+    probability_models <- c("ruleset1", "azimuth", "enpamgb")
 
     if (!is.na(method) && tolower(method) %in% regression_models) {
       score_cutoff <- 50

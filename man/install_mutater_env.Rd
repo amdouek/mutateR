@@ -6,14 +6,14 @@
 \usage{
 install_mutater_env(
   envname = "r-mutater",
-  python_version = "3.9",
+  python_version = "3.10",
   fresh = FALSE
 )
 }
 \arguments{
 \item{envname}{Character. Name of the conda environment (default "r-mutater").}
 
-\item{python_version}{Character. Python version to install (default "3.9").}
+\item{python_version}{Character. Python version to install (default "3.10" - required for ViennaRNA Windows wheels).}
 
 \item{fresh}{Logical. If TRUE, removes existing environment before installing.}
 }

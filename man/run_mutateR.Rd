@@ -12,6 +12,7 @@ run_mutateR(
   transcript_id = NULL,
   score_method = NULL,
   tracr = "Chen2013",
+  deephf_var = c("wt_u6", "wt_t7", "wt", "esp", "hf"),
   min_score = NULL,
   design_primers = TRUE,
   primer_max_wt = 3000,
@@ -40,10 +41,14 @@ run_mutateR(
 
 \item{tracr}{Character. For Rule Set 3 scoring - one of "Chen2013" (default) or "Hsu2013".}
 
+\item{deephf_var}{Character. For DeepHF scoring - one of "wt", "wt_u6" (default), "wt_t7", "esp", or "hf".
+See \code{\link{recommend_deephf_model}} for guidance on model selection based on
+experimental design (delivery method, Cas9 variant).}
+
 \item{min_score}{Numeric. Optional override for on-target score cutoff.
 If NULL (default), auto-selects based on scoring method:
 - DeepCpf1/DeepSpCas9: 50 (percentage scale)
-- RuleSet1/Azimuth/enPAM+GB: 0.5 (probability-like scale)
+- RuleSet1/Azimuth/enPAM+GB/DeepHF: 0.5 (probability-like scale)
 - RuleSet3: 0.1 (z-score scale)}
 
 \item{design_primers}{Logical. Whether to design genotyping primers (default TRUE).}
@@ -88,16 +93,46 @@ Executes all major steps of the mutateR pipeline end‑to‑end:
 \dontrun{
 library(BSgenome.Hsapiens.UCSC.hg38)
 
-# Cas9 workflow (default)
-result_cas9 <- run_mutateR(
+# Cas9 workflow (default scoring: RuleSet1)
+TP53_cas9 <- run_mutateR(
   gene_id = "TP53",
   species = "hsapiens",
   genome = BSgenome.Hsapiens.UCSC.hg38,
   nuclease = "Cas9"
 )
 
+# Cas9 workflow with DeepHF scoring (U6 promoter context)
+TP53_deephf <- run_mutateR(
+  gene_id = "TP53",
+  species = "hsapiens",
+  genome = BSgenome.Hsapiens.UCSC.hg38,
+  nuclease = "Cas9",
+  score_method = "deephf",
+  deephf_var = "wt_u6"
+)
+
+# Cas9 workflow with DeepHF for RNP delivery (T7/synthetic gRNA)
+TP53_deephf_rnp <- run_mutateR(
+  gene_id = "TP53",
+  species = "hsapiens",
+  genome = BSgenome.Hsapiens.UCSC.hg38,
+  nuclease = "Cas9",
+  score_method = "deephf",
+  deephf_var = "wt_t7"
+)
+
+# Cas9 workflow with DeepHF for eSpCas9(1.1)
+TP53_espcas9 <- run_mutateR(
+  gene_id = "TP53",
+  species = "hsapiens",
+  genome = BSgenome.Hsapiens.UCSC.hg38,
+  nuclease = "Cas9",
+  score_method = "deephf",
+  deephf_var = "esp"
+)
+
 # Wild-type Cas12a workflow
-result_cas12a <- run_mutateR(
+TP53_cas12a <- run_mutateR(
   gene_id = "TP53",
   species = "hsapiens",
   genome = BSgenome.Hsapiens.UCSC.hg38,
@@ -105,7 +140,7 @@ result_cas12a <- run_mutateR(
 )
 
 # Engineered enCas12a workflow (expanded PAM)
-result_encas12a <- run_mutateR(
+TP53_encas12a <- run_mutateR(
   gene_id = "TP53",
   species = "hsapiens",
   genome = BSgenome.Hsapiens.UCSC.hg38,

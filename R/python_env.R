@@ -4,12 +4,12 @@
 #' containing TensorFlow, primer3-py, and necessary dependencies.
 #'
 #' @param envname Character. Name of the conda environment (default "r-mutater").
-#' @param python_version Character. Python version to install (default "3.9").
+#' @param python_version Character. Python version to install (default "3.10" - required for ViennaRNA Windows wheels).
 #' @param fresh Logical. If TRUE, removes existing environment before installing.
 #'
 #' @export
 install_mutater_env <- function(envname = "r-mutater",
-                                python_version = "3.9",
+                                python_version = "3.10",
                                 fresh = FALSE) {
 
   if (!requireNamespace("reticulate", quietly = TRUE)) {
@@ -46,8 +46,12 @@ install_mutater_env <- function(envname = "r-mutater",
   reticulate::conda_create(envname, python_version = python_version)
 
   # 4. Install dependencies
-  # Note: Pinning numpy<2 is currently recommended for TensorFlow compatibility
-  pkgs <- c("tensorflow-cpu", "numpy<2", "h5py", "pandas", "scipy", "primer3-py", "rs3", "scikit-learn", "biopython") # We currently don't really need gpu for what we do here, so tensorflow-cpu will suffice
+  # Note: Python 3.10+ required for ViennaRNA Windows wheels
+  # Note: Pinning numpy<2 is recommended for TensorFlow compatibility
+  # Note: TensorFlow pinned to 2.15.x to maintain Keras 2 compatibility
+  # (required for loading legacy DeepHF, DeepSpCas9, DeepCpf1 model weights)
+  pkgs <- c("tensorflow-cpu==2.15.0", "numpy<2", "h5py", "pandas", "scipy",
+            "primer3-py", "rs3", "scikit-learn", "biopython", "viennarna")
 
   message("Installing packages: ", paste(pkgs, collapse = ", "))
   reticulate::conda_install(envname, packages = pkgs, pip = TRUE)

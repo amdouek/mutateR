@@ -8,7 +8,8 @@ score_grnas(
   grna_gr,
   method = c("ruleset1", "azimuth", "ruleset3", "deepspcas9", "deephf", "deepcpf1",
     "enpamgb"),
-  tracr = "Chen2013"
+  tracr = "Chen2013",
+  deephf_var = c("wt_u6", "wt_t7", "wt", "esp", "hf")
 )
 }
 \arguments{
@@ -17,11 +18,28 @@ score_grnas(
 \item{method}{Scoring model name. Default "ruleset1".}
 
 \item{tracr}{Character. For Rule Set 3 scoring; one of "Chen2013" (default) or "Hsu2013".}
+
+\item{deephf_var}{Character. For DeepHF scoring; one of "wt", "wt_u6" (default), "wt_t7", "esp", or "hf".
+See \code{\link{recommend_deephf_model}} for guidance on model selection.}
 }
 \value{
 GRanges with added metadata columns \code{ontarget_score} and \code{scoring_method}.
 }
 \description{
-Currently handles RuleSet1 and Azimuth (Cas9), DeepSpCas9 (Cas9), RuleSet 3 (Cas9),  DeepCpf1 (Cas12a), and enPAM+GB (Cas12a/enCas12a).
-Automatically routes deep learning methods to the internal Python backend on Windows (requires miniconda and separate env install, see \code{\link[=install_mutater_env]{install_mutater_env()}}.
+Currently handles RuleSet1 and Azimuth (Cas9), DeepSpCas9 (Cas9), RuleSet 3 (Cas9),
+DeepHF (Cas9/eSpCas9/SpCas9-HF1), DeepCpf1 (Cas12a), and enPAM+GB (Cas12a/enCas12a).
 }
+\section{DeepHF Model Selection}{
+
+The DeepHF method supports multiple enzyme/context variants:
+\describe{
+\item{wt}{Original DeepWt model (base training)}
+\item{wt_u6}{Optimised for U6 promoter-driven gRNA expression (default).
+Best for: plasmid transfection, lentiviral delivery.}
+\item{wt_t7}{Optimised for T7 promoter-driven in vitro transcribed gRNAs.
+Best for: RNP delivery with IVT gRNA, synthetic gRNA.}
+\item{esp}{Model for eSpCas9(1.1) high-fidelity variant.}
+\item{hf}{Model for SpCas9-HF1 high-fidelity variant.}
+}
+}
+

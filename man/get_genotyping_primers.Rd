@@ -29,5 +29,5 @@ The input data frame with added primer columns.
 \description{
 Automatically designs PCR primers to genotype CRISPR-mediated deletions.
 Uses the primer3-py backend for thermodynamic accuracy.
-Optimized with batch processing to reduce R-Python overhead.
+Optimised with batch processing to reduce R-Python overhead.
 }

@@ -1,6 +1,6 @@
 #' Integrate gRNA scoring data with exon‑pair compatibility
 #'
-#' Returns scored Cas9 gRNAs that lie within exons
+#' Returns scored Cas9/Cas12a gRNAs that lie within exons
 #' participating in phase‑compatible exon pairs or predicted
 #' terminal‑exon PTC cases.
 #'
@@ -8,27 +8,34 @@
 #' @param genome   BSgenome object for the relevant species.
 #' @param species  Character, e.g. "hsapiens".
 #' @param nuclease Character. One of "Cas9", "Cas12a" or "enCas12a".
-#' @param score_method Character. One of "ruleset1", "azimuth", "deepspcas9", "deephf", "ruleset3 (Cas9), "deepcpf1" (Cas12a), or "enpamgb" (enCas12a).
+#' @param score_method Character. One of "ruleset1", "azimuth", "deepspcas9",
+#'        "deephf", "ruleset3" (Cas9), "deepcpf1" (Cas12a), or "enpamgb" (enCas12a).
 #' @param scored_grnas Precomputed on-target scores passed from elsewhere (default NULL, evokes scoring).
 #' @param tracr Character, either "Chen2013" (default) or "Hsu2013" - only for ruleset3 scoring.
+#' @param deephf_var Character. For DeepHF scoring; one of "wt", "wt_u6" (default), "wt_t7", "esp", or "hf".
+#'        See \code{\link{recommend_deephf_model}} for guidance on model selection.
 #'
-#' @return GRanges of scored, biologically admissible gRNAs.
+#' @return GRanges of scored, mutateR-allowed gRNAs.
 #' @export
 filter_valid_grnas <- function(exon_gr,
                                genome,
                                species,
                                nuclease = c("Cas9", "Cas12a", "enCas12a"),
-                               score_method = c("ruleset1","azimuth","deephf","deepcpf1","deepspcas9","ruleset3","enpamgb"),
+                               score_method = c("ruleset1", "azimuth", "deepspcas9",
+                                                "deephf", "ruleset3",
+                                                "deepcpf1", "enpamgb"),
                                scored_grnas = NULL,
-                               tracr = "Chen2013") {
-  nuclease = match.arg(nuclease)
+                               tracr = "Chen2013",
+                               deephf_var = c("wt_u6", "wt_t7", "wt", "esp", "hf")) {
+
+  nuclease <- match.arg(nuclease)
   score_method <- match.arg(score_method)
+  deephf_var <- match.arg(deephf_var)
 
   # ---- Validate nuclease/score_method compatibility ----
-  cas9_methods <- c("ruleset1", "azimuth", "deephf", "deepspcas9", "ruleset3")
+  cas9_methods <- c("ruleset1", "azimuth", "deepspcas9", "deephf", "ruleset3")
   cas12a_methods <- c("deepcpf1")
   encas12a_methods <- c("enpamgb")
-
 
   if (nuclease == "Cas9" && !score_method %in% cas9_methods) {
     warning("Score method '", score_method, "' is not designed for Cas9. ",
@@ -39,6 +46,11 @@ filter_valid_grnas <- function(exon_gr,
   } else if (nuclease == "enCas12a" && !score_method %in% encas12a_methods) {
     warning("Score method '", score_method, "' is not optimised for enCas12a. ",
             "Consider using: ", paste(encas12a_methods, collapse = ", "))
+  }
+
+  # ---- Validate DeepHF variant parameter usage ----
+  if (score_method != "deephf" && !missing(deephf_var)) {
+    message("Note: 'deephf_var' parameter is only used with score_method='deephf'. Ignoring.")
   }
 
   ## ---- 0. Early‑exit for single‑exon and two‑exon transcripts ----------
@@ -57,7 +69,11 @@ filter_valid_grnas <- function(exon_gr,
       warning("No target sites found.")
       return(NULL)
     }
-    grna_sites <- score_grnas(grna_sites, method = score_method, tracr = tracr)
+
+    grna_sites <- score_grnas(grna_sites,
+                              method = score_method,
+                              tracr = tracr,
+                              deephf_var = deephf_var)
     return(grna_sites)
   }
 
@@ -84,7 +100,7 @@ filter_valid_grnas <- function(exon_gr,
     pair_info$exon_3p[pair_info$compatible | pair_info$terminal_exon_case]
   ))
 
-  ## ---- 2. Collect and score Cas9 sites -------------------------------
+  ## ---- 2. Collect and score gRNA sites -------------------------------
   if (!is.null(scored_grnas)) {
     # Use pre-scored gRNAs if provided
     grna_sites <- scored_grnas
@@ -101,7 +117,10 @@ filter_valid_grnas <- function(exon_gr,
       return(NULL)
     }
 
-    grna_sites <- score_grnas(grna_sites, method = score_method, tracr = tracr)
+    grna_sites <- score_grnas(grna_sites,
+                              method = score_method,
+                              tracr = tracr,
+                              deephf_var = deephf_var)
   }
 
   ## ---- 3. Annotate exon rank if missing -------------------------------
