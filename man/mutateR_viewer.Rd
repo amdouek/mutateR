@@ -12,5 +12,6 @@ mutateR_viewer(plot_obj)
 }
 \description{
 Launches a small Shiny gadget showing the interactive Plotly heatmap.
-Clicking a cell filters the gRNA table below. Primer3-generated genotyping primers are displayed for each recommended gRNA pair.
+Clicking a cell filters the gRNA table below.
+Primer3-generated genotyping primers are displayed for each recommended gRNA pair.
 }

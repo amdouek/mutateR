@@ -13,9 +13,9 @@ score_grnas(
 )
 }
 \arguments{
-\item{grna_gr}{GRanges returned by find_cas9_sites() or find_cas12a_sites().}
+\item{grna_gr}{GRanges. Returned by find_cas9_sites() or find_cas12a_sites().}
 
-\item{method}{Scoring model name. Default "ruleset1".}
+\item{method}{Character. Scoring model name. Default "ruleset1".}
 
 \item{tracr}{Character. For Rule Set 3 scoring; one of "Chen2013" (default) or "Hsu2013".}
 
@@ -26,6 +26,7 @@ See \code{\link{recommend_deephf_model}} for guidance on model selection.}
 GRanges with added metadata columns \code{ontarget_score} and \code{scoring_method}.
 }
 \description{
+Performs on-target scoring for gRNAs using selected methods for the relevant nuclease.
 Currently handles RuleSet1 and Azimuth (Cas9), DeepSpCas9 (Cas9), RuleSet 3 (Cas9),
 DeepHF (Cas9/eSpCas9/SpCas9-HF1), DeepCpf1 (Cas12a), and enPAM+GB (Cas12a/enCas12a).
 }

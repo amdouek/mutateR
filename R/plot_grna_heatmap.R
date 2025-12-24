@@ -1,6 +1,6 @@
 #' @title Plot exon‑phase compatibility as a discrete heatmap
 #'
-#' @descriotion Helper function for large-gene visualisation.
+#' @description Helper function for large-gene visualisation.
 #'
 #' @param exon_gr GRanges from get_exon_structures(output="GRanges")
 #' @param transcript_id Character. Transcript label.

@@ -1,6 +1,5 @@
 #' @title Plot exon structure, phase compatibility and recommended gRNA pairs
 #'
-#'
 #' @param exon_gr       GRanges from get_exon_structures(output="GRanges")
 #' @param pairs_df      Data frame from assemble_grna_pairs()
 #' @param transcript_id Character transcript/gene label for the title.

@@ -17,11 +17,11 @@ filter_valid_grnas(
 )
 }
 \arguments{
-\item{exon_gr}{GRanges from get_exon_structures(output="GRanges").}
+\item{exon_gr}{GRanges. Returned by get_exon_structures(output="GRanges").}
 
 \item{genome}{BSgenome object for the relevant species.}
 
-\item{species}{Character, e.g. "hsapiens".}
+\item{species}{Character, using short-form species name e.g. "hsapiens".}
 
 \item{nuclease}{Character. One of "Cas9", "Cas12a" or "enCas12a".}
 
@@ -30,7 +30,7 @@ filter_valid_grnas(
 
 \item{scored_grnas}{Precomputed on-target scores passed from elsewhere (default NULL, evokes scoring).}
 
-\item{tracr}{Character, either "Chen2013" (default) or "Hsu2013" - only for ruleset3 scoring.}
+\item{tracr}{Character. Either "Chen2013" (default) or "Hsu2013" - only for ruleset3 scoring.}
 
 \item{deephf_var}{Character. For DeepHF scoring; one of "wt", "wt_u6" (default), "wt_t7", "esp", or "hf".
 See \code{\link{recommend_deephf_model}} for guidance on model selection.}

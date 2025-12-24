@@ -2,7 +2,7 @@
 % Please edit documentation in R/design_primers.R
 \name{get_genotyping_primers}
 \alias{get_genotyping_primers}
-\title{Design genotyping primers for mutateR-designed deletions (Batched)}
+\title{Design genotyping primers for mutateR-designed deletions}
 \usage{
 get_genotyping_primers(
   pairs_df,

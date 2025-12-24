@@ -1,6 +1,6 @@
 #' @title Design gRNA pairs for exon deletions
 #'
-#' @descriotion Integrates exon structure, Cas effector targeting rules, exon phase compatibility,
+#' @description Integrates exon structure, Cas effector targeting rules, exon phase compatibility,
 #' protein domain annotations, and PTC predictions to propose candidate
 #' gRNA pairs that could induce an in-frame (or allowable frame-shifting) exon deletion.
 #'

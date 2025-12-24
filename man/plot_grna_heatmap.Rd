@@ -2,8 +2,7 @@
 % Please edit documentation in R/plot_grna_heatmap.R
 \name{plot_grna_heatmap}
 \alias{plot_grna_heatmap}
-\title{Plot exon‑phase compatibility as a discrete heatmap
-(helper function for large-gene visualisation)}
+\title{Plot exon‑phase compatibility as a discrete heatmap}
 \usage{
 plot_grna_heatmap(
   exon_gr,
@@ -27,6 +26,5 @@ plot_grna_heatmap(
 ggplot object
 }
 \description{
-Plot exon‑phase compatibility as a discrete heatmap
-(helper function for large-gene visualisation)
+Helper function for large-gene visualisation.
 }
