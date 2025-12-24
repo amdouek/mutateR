@@ -1,8 +1,7 @@
-#' Internal function to run DeepCpf1 via reticulate
+#' @title Internal function to run DeepCpf1 via reticulate
 #'
-#' This function defines the Seq-DeepCpf1 architecture (Kim et al. 2018),
-#' manually loads the legacy weights from the .h5 file to resolve shape mismatches,
-#' and runs inference on the one-hot encoded DNA.
+#' @description This function defines the Seq-DeepCpf1 architecture (Kim et al. 2018),
+#' loads weights from the .h5 file, and runs inference on the one-hot encoded DNA.
 #'
 #' @param sequence_context Character vector of 34 bp sequences.
 #' @return Numeric vector of on-target scores.

@@ -1,6 +1,6 @@
-#' Internal function to run RuleSet3 (Sequence) via reticulate
+#' @title Internal function to run RuleSet3 (Sequence) via reticulate
 #'
-#' Calls the rs3 Python package (DeWeirdt et al., 2022) for on-target scoring.
+#' @description Calls the rs3 Python package (DeWeirdt et al., 2022) for on-target scoring.
 #' Uses the Sequence-only model, which predicts activity based on:
 #' - Nucleotide identity and position
 #' - GC content and thermodynamic properties
@@ -147,9 +147,9 @@ def predict_rs3_seq(sequences, tracr_variant, n_jobs):
 }
 
 
-#' Validate RS3 installation
+#' @title Validate RS3 installation
 #'
-#' Tests that the RS3 Python module is correctly installed and functional.
+#' @description Tests that the RS3 Python module is correctly installed and functional.
 #'
 #' @return Logical; TRUE if RS3 is working correctly, FALSE otherwise.
 #' @export

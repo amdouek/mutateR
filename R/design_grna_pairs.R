@@ -1,6 +1,6 @@
-#' Design gRNA pairs for exon deletions
+#' @title Design gRNA pairs for exon deletions
 #'
-#' Integrates exon structure, Cas effector targeting rules, exon phase compatibility,
+#' @descriotion Integrates exon structure, Cas effector targeting rules, exon phase compatibility,
 #' protein domain annotations, and PTC predictions to propose candidate
 #' gRNA pairs that could induce an in-frame (or allowable frame-shifting) exon deletion.
 #'
@@ -97,7 +97,7 @@ design_grna_pairs <- function(gene_id, species,
     warning("Transcript ", tx_id, " has ", n_total_exons, " total exon(s) (",
             n_coding_exons, " coding). Performing intragenic large‑deletion design.")
 
-    ### ----- Step 2A: Locate gRNA sites (NOTE: Cas12a workflow is functional, update function to reflect) -----
+    ### ----- Step 2A: Locate gRNA sites -----
     if (nuclease != "Cas9")
       warning("Edge‑case mode currently implemented for Cas9 only.")
 

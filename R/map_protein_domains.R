@@ -1,6 +1,6 @@
-#' Map protein domain annotations to exons (Pfam or InterPro, Ensembl ≥115‑compatible)
+#' @title Map protein domain annotations to exons (Pfam or InterPro, Ensembl ≥115‑compatible)
 #'
-#' Retrieves annotated Pfam or InterPro domains for a given Ensembl transcript.
+#' @description Retrieves annotated Pfam or InterPro domains for a given Ensembl transcript.
 #' Domain amino‑acid coordinates are mapped to the specific exons they overlap,
 #' yielding biologically faithful exon–domain assignments.
 #'

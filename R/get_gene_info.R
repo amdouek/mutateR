@@ -1,6 +1,6 @@
-#' Retrieve transcript information for a selected gene from a given species
+#' @title Retrieve transcript information for a selected gene from a given species
 #'
-#' Queries Ensembl via biomaRt to retrieve transcript annotation for a given
+#' @description Queries Ensembl via biomaRt to retrieve transcript annotation for a given
 #' gene symbol or Ensembl gene ID in a specified species. Canonical
 #' transcript(s), if any, are flagged and the output separated into a list of
 #' two data.frames (all transcripts, and just the canonical transcript

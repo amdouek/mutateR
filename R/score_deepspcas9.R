@@ -1,15 +1,14 @@
-#' Internal function to run DeepSpCas9 via reticulate
+#' @title Internal function to run DeepSpCas9 via reticulate
 #'
-#' This function reconstructs the DeepSpCas9 architecture (Kim et al. 2019)
-#' based on the verified checkpoint structure:
-#' - Input: 30bp (4bp 5' flank + 20bp protospacer + 3bp PAM + 3bp 3' flank).
-#' - Conv Layer: Inception Module (K3:100, K5:70, K7:40).
+#' @description This function reconstructs the DeepSpCas9 architecture (Kim et al. 2019):
+#' - Input: 30bp (4 bp 5' flank + 20 bp protospacer + 3 bp PAM + 3 bp 3' flank).
+#' - Conv Layer: Inception module (K3:100, K5:70, K7:40).
 #' - Pooling: AveragePooling1D (pool_size=2) on all branches.
 #' - Merge: Concatenation (Flattened). Total features = 2790.
 #' - Dense: 80 -> 60 -> 1.
 #'
 #' @param sequence_context Character vector of 30 bp sequences.
-#' @return Numeric vector of on-target scores (Linear regression output).
+#' @return Numeric vector of on-target scores (linear regression output).
 #' @noRd
 predict_deepspcas9_python <- function(sequence_context) {
 
@@ -28,7 +27,6 @@ predict_deepspcas9_python <- function(sequence_context) {
   }
 
   # --- 3. Prepare data & weights ---
-  # We look for the converted H5 file now
   weights_file <- system.file("extdata", "DeepSpCas9_weights.h5", package = "mutateR")
   if (weights_file == "") {
     if (file.exists("./inst/extdata/DeepSpCas9_weights.h5")) {

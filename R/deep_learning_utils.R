@@ -1,7 +1,8 @@
-#' Fetch DeepCpf1 model weights
+#' @title Fetch DeepCpf1 model weights
 #'
-#' Retrieves the path to the embedded DeepCpf1 weights file.
-#' Note: The weights used is for the Seq-DeepCpf1 model (solely sequence-dependent). The better-performing DeepCpf1 model integrates chromatin accessibility data, but this is cell-line specific rather than useful across organisms, and so is not implemented here.
+#' @description Retrieves the path to the embedded DeepCpf1 weights file.
+#' Note: The weights used is for the Seq-DeepCpf1 model (solely sequence-dependent).
+#' The better-performing DeepCpf1 model integrates chromatin accessibility data, but this is cell-line specific rather than useful across organisms, and so is not implemented here.
 #'
 #' @return Path to the weights file (.h5).
 #' @export
@@ -19,9 +20,9 @@ fetch_deepcpf1_weights <- function() {
   return(weights_path)
 }
 
-#' One-hot encode DNA sequences for deep learning
+#' @title One-hot encode DNA sequences for deep learning
 #'
-#' Converts a set of DNA sequences into a 3D numeric array
+#' @description Converts a set of DNA sequences into a 3D numeric array
 #' (Samples x Length x 4) suitable for Keras/TensorFlow.
 #' Optimised for performance.
 #'

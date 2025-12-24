@@ -1,6 +1,6 @@
-#' Run the complete mutateR workflow
+#' @title Run the complete mutateR workflow
 #'
-#' Executes all major steps of the mutateR pipeline end‑to‑end:
+#' @description Executes all major steps of the mutateR pipeline end‑to‑end:
 #' 1. Gene/Transcript retrieval
 #' 2. Exon phase mapping
 #' 3. gRNA finding & scoring (Cas9, Cas12a, or enCas12a)
@@ -182,7 +182,7 @@ run_mutateR <- function(gene_id,
     }
   }
 
-  ## ----- Step 3: Find gRNAs -----
+  ## ----- Step 3A: Find gRNAs -----
   if (!quiet) {
     pam_info <- switch(nuclease,
                        "Cas9" = "NGG",
@@ -210,7 +210,7 @@ run_mutateR <- function(gene_id,
                 plot = generate_early_plot(NULL)))
   }
 
-  # --- Step 3A: PAM Distribution Reporting ---
+  # --- Step 3B: PAM distribution reporting ---
   if (!quiet && "pam_sequence" %in% names(mcols(hits))) {
     pam_counts <- table(hits$pam_sequence)
     message("PAM distribution:")
@@ -269,7 +269,7 @@ run_mutateR <- function(gene_id,
     }
   )
 
-  ## ----- Step 6: Intragenic detection & unpacking -----
+  ## ----- Step 6: Intragenic mode detection & unpacking (prelim, to develop further) -----
   intragenic_mode <- FALSE
   if (is.list(pairs_df) && "pairs" %in% names(pairs_df)) {
     pairs_df <- pairs_df$pairs

@@ -1,6 +1,6 @@
-#' Find Cas12a (Cpf1) target sites in exons
+#' @title Find Cas12a (Cpf1) target sites in exons
 #'
-#' Scans exon sequences (both strands) for Cas12a gRNA sites (default PAM "TTTV")
+#' @description Scans exon sequences (both strands) for Cas12a gRNA sites (default PAM "TTTV")
 #' Retrieves full genomic context needed for DeepCpf1 scoring (34 bp) even if sites are near exon boundaries.
 #'
 #'
@@ -46,11 +46,11 @@ find_cas12a_sites <- function(exon_gr,
         proto_end   <- pam_end + protospacer_length
         if (proto_end > exon_len) next
 
-        # Calculate Genomic Coordinates
+        # Calculate genomic coordinates
         gen_pam_start <- start(gr) + pam_start - 1
         gen_proto_end <- start(gr) + proto_end - 1
 
-        # Calculate Context Coordinates (34 bp window)
+        # Calculate context coordinates (34 bp window)
         # 4 bp upstream of PAM start
         ctx_gen_start <- gen_pam_start - 4
         # End = Start + 33 (Total 34 bp)
@@ -96,16 +96,16 @@ find_cas12a_sites <- function(exon_gr,
         proto_end_rc   <- pam_end_rc + protospacer_length
         if (proto_end_rc > nchar(exon_seq_rc)) next
 
-        # Genomic Mapping (Reverse Strand)
-        # RC index 1 = Genomic End. RC Index k = Genomic End - (k-1)
+        # Genomic mapping (Reverse Strand)
+        # RC index 1 = genomic end. RC Index k = genomic end - (k-1)
         gen_pam_start_5p <- end(gr) - (pam_start_rc - 1) # 5' of PAM on minus strand (high coord)
         gen_proto_end_3p <- end(gr) - (proto_end_rc - 1) # 3' of Proto on minus strand (low coord)
 
-        # Context on Minus Strand
-        # We need 4bp upstream (higher coord), 29bp downstream (lower coord) relative to PAM 5'
+        # Context on minus strand
+        # We need 4 bp upstream (higher coord), 29 bp downstream (lower coord) relative to PAM 5'
         # GRanges handles the strand inversion. We just need to define the span.
-        # High Coord (Genomic Start of Context on Minus) = PAM_5p + 4
-        # Low Coord (Genomic End of Context on Minus) = High - 33
+        # High Coord (Genomic start of context on minus) = PAM_5p + 4
+        # Low Coord (Genomic end of context on minus) = High - 33
 
         ctx_gen_high <- gen_pam_start_5p + 4
         ctx_gen_low  <- ctx_gen_high - 33

@@ -1,4 +1,4 @@
-#' Plot exon structure, phase compatibility and recommended gRNA pairs
+#' @title Plot exon structure, phase compatibility and recommended gRNA pairs
 #'
 #'
 #' @param exon_gr       GRanges from get_exon_structures(output="GRanges")
@@ -46,7 +46,7 @@ plot_grna_design <- function(exon_gr,
   n_exons <- nrow(exon_df)
   exon_df$rank <- seq_len(n_exons)
 
-  ## ---- Early exit for large genes --------------------------------------
+  ## ---- Early exit for large genes ----
   if (length(exon_gr) > 12) {
     message("Detected large gene (>12 exons); switching to heatmap mode.")
     return(
@@ -57,7 +57,7 @@ plot_grna_design <- function(exon_gr,
     )
   }
 
-  ## -- Detect intragenic mode ------------------------------------------
+  ## -- Detect intragenic mode --
   intragenic_mode <- n_exons <= 2 ||
     (!is.null(pairs_df) &&
        "del_size" %in% names(pairs_df) &&
@@ -109,7 +109,7 @@ plot_grna_design <- function(exon_gr,
       arc_tbl <- tibble()
     }
 
-    # --- then plotting ---
+    # --- Plotting ---
     p <- ggplot() +
       geom_rect(data = exon_blocks,
                 aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),

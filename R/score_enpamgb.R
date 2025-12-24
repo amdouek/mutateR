@@ -1,7 +1,7 @@
-#' Internal function to run enPAM+GB via reticulate
+#' @title Internal function to run enPAM+GB via reticulate
 #'
-#' This function loads the enPAM+GB scikit-learn Gradient Boosting model
-#' (DeWeirdt et al.) and performs feature engineering for Cas12a/enCas12a
+#' @description This function loads the enPAM+GB scikit-learn Gradient Boosting model
+#' (DeWeirdt et al. 2021) and performs feature engineering for Cas12a/enCas12a
 #' on-target activity prediction.
 #'
 #' The model uses the following features:
@@ -369,9 +369,9 @@ return(as.numeric(scores))
 }
 
 
-#' Validate enPAM+GB installation
+#' @title Validate enPAM+GB installation
 #'
-#' Tests that the enPAM+GB model and dependencies are correctly installed.
+#' @description Tests that the enPAM+GB model and dependencies are correctly installed.
 #'
 #' @return Logical; TRUE if enPAM+GB is working correctly, FALSE otherwise.
 #' @export

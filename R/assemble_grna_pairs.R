@@ -1,6 +1,6 @@
-#' Assemble and annotate gRNA pairs for exon‑flanking deletions
+#' @title Assemble and annotate gRNA pairs for exon‑flanking deletions
 #'
-#' Merges gRNAs for phase-compatible exon pairs.
+#' @description Merges gRNAs for phase-compatible exon pairs.
 #' Automatically detects scoring method to apply appropriate cutoffs:
 #' - DeepCpf1 / DeepSpCas9: > 50 (linear regression on indel frequency)
 #' - RuleSet1 / Azimuth / enPAM+GB: > 0.5 (probability-like scores)
@@ -23,7 +23,7 @@ assemble_grna_pairs <- function(grna_gr,
   stopifnot(inherits(grna_gr, "GRanges"))
   message("Assembling gRNA pairs for exon‑flanking deletions...")
 
-  # ---- 1. Determine score cutoff ------------------------------------
+  # ---- 1. Determine score cutoff ----
   if (is.null(score_cutoff)) {
     # Check metadata for scoring method
     method <- if ("scoring_method" %in% names(mcols(grna_gr))) unique(mcols(grna_gr)$scoring_method)[1] else "ruleset1"
@@ -51,7 +51,7 @@ assemble_grna_pairs <- function(grna_gr,
     }
   }
 
-  # ---- 2. Flatten on-target scores safely ---------------------------
+  # ---- 2. Flatten on-target scores safely ----
   raw_scores <- mcols(grna_gr)$ontarget_score
   if (is.numeric(raw_scores)) {
     numeric_scores <- raw_scores
@@ -60,7 +60,7 @@ assemble_grna_pairs <- function(grna_gr,
   }
   numeric_scores[is.nan(numeric_scores)] <- NA_real_
 
-  # ---- 3. Intragenic mode (≤2 exons) --------------------------------
+  # ---- 3. Intragenic mode (≤2 exons) ----
   n_exons <- length(exon_gr)
   if (n_exons <= 2) {
     message("Single-exon/two-exon gene detected: constructing intragenic deletion pairs.")
@@ -96,7 +96,7 @@ assemble_grna_pairs <- function(grna_gr,
     return(list(pairs = intragenic[intragenic$recommended == TRUE, ], intragenic_mode = TRUE))
   }
 
-  # ---- 4. Multi-exon logic ------------------------------------------
+  # ---- 4. Multi-exon logic ----
   exon_meta <- as.data.frame(mcols(exon_gr))
   exon_meta$rank <- seq_len(nrow(exon_meta))
   comp_pairs <- check_exon_phase(exon_meta, include_contiguous = FALSE)
@@ -157,7 +157,7 @@ assemble_grna_pairs <- function(grna_gr,
   out <- do.call(rbind, results)
 
   # Technical filter: Minimal deletion size & potential for steric hindrance
-  # Deletions < 50 bp are hard to genotype by agarose gel
+  # Deletions < 50 bp are harder to genotype by agarose gel
   # Cas effector footprint causing steric hindrance if two RNPs are too close to each other.
   out <- out[out$genomic_deletion_size > 50, ]
 

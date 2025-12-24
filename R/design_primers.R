@@ -1,6 +1,6 @@
-#' Design genotyping primers for mutateR-designed deletions (Batched)
+#' @title Design genotyping primers for mutateR-designed deletions
 #'
-#' Automatically designs PCR primers to genotype CRISPR-mediated deletions.
+#' @description Automatically designs PCR primers to genotype CRISPR-mediated deletions.
 #' Uses the primer3-py backend for thermodynamic accuracy.
 #' Optimised with batch processing to reduce R-Python overhead.
 #'
@@ -37,7 +37,7 @@ get_genotyping_primers <- function(pairs_df,
 
   if (nrow(pairs_df) == 0) return(pairs_df)
 
-  # --- 2. Filter Identical Cut Sites (0 bp Deletions) ---
+  # --- 2. Filter identical cut sites (0 bp deletions) ---
   is_distinct <- pairs_df$cut_site_5p != pairs_df$cut_site_3p
   if (any(!is_distinct)) {
     pairs_df <- pairs_df[is_distinct, ]
@@ -45,7 +45,7 @@ get_genotyping_primers <- function(pairs_df,
 
   if (nrow(pairs_df) == 0) return(pairs_df)
 
-  # --- Setup Variables ---
+  # --- Setup variables ---
   n_total <- nrow(pairs_df)
   exons_df <- as.data.frame(exons_gr)
   padding <- 600
@@ -70,7 +70,7 @@ get_genotyping_primers <- function(pairs_df,
   message("Preparing primer design batch requests...")
   pb <- utils::txtProgressBar(min = 0, max = n_total, style = 3)
 
-  # --- PHASE 1: Build Requests in R ---
+  # --- PHASE 1: Build requests in R ---
   for (i in seq_len(n_total)) {
     utils::setTxtProgressBar(pb, i)
 
@@ -152,8 +152,6 @@ get_genotyping_primers <- function(pairs_df,
 
         # Priority 1: Largest deleted exon
         if (nrow(del_exons) > 0) {
-          # FIX: Use 'end' and 'start' (GRanges defaults) instead of 'exon_chrom_end/start'
-          # which are stripped when converting GRanges -> data.frame
           best_ex <- del_exons[which.max(del_exons$end - del_exons$start), ]
           w <- best_ex$end - best_ex$start
 

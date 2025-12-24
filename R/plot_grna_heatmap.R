@@ -1,5 +1,6 @@
-#' Plot exon‑phase compatibility as a discrete heatmap
-#' (helper function for large-gene visualisation)
+#' @title Plot exon‑phase compatibility as a discrete heatmap
+#'
+#' @descriotion Helper function for large-gene visualisation.
 #'
 #' @param exon_gr GRanges from get_exon_structures(output="GRanges")
 #' @param transcript_id Character. Transcript label.
@@ -21,13 +22,13 @@ plot_grna_heatmap <- function(exon_gr,
     library(RColorBrewer)
   })
 
-  ## ----- 1. Extract exon metadata ------------------------------------
+  ## ----- 1. Extract exon metadata -----
   ex_meta <- as.data.frame(mcols(exon_gr))
   ex_meta$rank <- seq_len(nrow(ex_meta))
   ex_meta <- ex_meta %>%
     mutate(is_UTR = (start_phase == -1 & end_phase == -1))
 
-  ## ----- 2. Compute phase compatibility ------------------------------
+  ## ----- 2. Compute phase compatibility -----
   comp_df <- check_exon_phase(ex_meta, include_contiguous = TRUE)
   comp_df$Category <- ifelse(comp_df$compatible, "Compatible", "Incompatible")
 
@@ -60,7 +61,7 @@ plot_grna_heatmap <- function(exon_gr,
     "UTR" = "firebrick3"
   )
 
-  ## ----- 3. Retrieve domain annotations ------------------------------
+  ## ----- 3. Retrieve domain annotations -----
   domain_df <- tryCatch(
     map_protein_domains(transcript_id,
                         species = species,
@@ -81,7 +82,7 @@ plot_grna_heatmap <- function(exon_gr,
       distinct(domain_desc, .keep_all = TRUE)
   }
 
-  ## ----- 4. Base heatmap --------------------------------------------
+  ## ----- 4. Base heatmap -----
   p_heat <- ggplot(mat_df, aes(x = exon_5p, y = exon_3p, fill = Category)) +
     geom_tile(colour = "white", linewidth = 0.25) +
     scale_fill_manual(values = cat_cols,
@@ -106,11 +107,11 @@ plot_grna_heatmap <- function(exon_gr,
       " - Exon phase-compatibility matrix"
     ))
 
-  ## ----- 5. Domain annotation layer ----------------------------------
+  ## ----- 5. Domain annotation layer -----
   if (!is.null(domain_plot_df) && nrow(domain_plot_df) > 0) {
     n_domains <- nrow(domain_plot_df)
 
-    # vertical tracks (all below the heatmap)
+    # Vertical tracks (all below the heatmap)
     domain_plot_df <- domain_plot_df %>%
       mutate(
         y_base = -1.2,
@@ -121,7 +122,7 @@ plot_grna_heatmap <- function(exon_gr,
 
     domain_cols <- RColorBrewer::brewer.pal(min(max(3, n_domains), 8), "Set2")
 
-    # assign label placement: alternate above/below
+    # Assign label placement: alternate above/below
     domain_plot_df$label_y <- ifelse(seq_len(n_domains) %% 2 == 1,
                                      domain_plot_df$ymax + 0.1,  # odd -> above
                                      domain_plot_df$ymin - 0.1)  # even -> below

@@ -1,6 +1,6 @@
-#' Install the mutateR Python environment
+#' @title Install the mutateR Python environment
 #'
-#' Sets up a specific Conda environment for mutateR
+#' @description Sets up a specific Conda environment for mutateR
 #' containing TensorFlow, primer3-py, and necessary dependencies.
 #'
 #' @param envname Character. Name of the conda environment (default "r-mutater").
@@ -91,7 +91,7 @@ activate_mutater_env <- function(envname = "r-mutater") {
     return(TRUE)
   }
 
-  # 2. Check and Fix RETICULATE_PYTHON collision
+  # 2. Check and fix RETICULATE_PYTHON collision
   sys_ret_py <- Sys.getenv("RETICULATE_PYTHON")
   if (sys_ret_py != "") {
     if (!grepl(envname, sys_ret_py, fixed = TRUE)) {
@@ -118,7 +118,7 @@ activate_mutater_env <- function(envname = "r-mutater") {
       }
     }
 
-    # 5. Check TensorFlow (Primary Dependency)
+    # 5. Check TensorFlow
     if (!reticulate::py_module_available("tensorflow")) {
       warning("Environment activated, but TensorFlow not found. Try running install_mutater_env(fresh=TRUE).")
       return(FALSE)

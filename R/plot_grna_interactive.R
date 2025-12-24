@@ -1,6 +1,6 @@
-#' Interactive gRNA design plot
+#' @title Interactive gRNA design plot
 #'
-#' Interactive plotting mode for heatmap via plotly.
+#' @description Interactive plotting mode for heatmap via plotly.
 #' If no allowed gRNA pairs, plots just the exon phase compatibility.
 #'
 #' @export
@@ -30,7 +30,7 @@ plot_grna_interactive <- function(exon_gr,
 
   merged <- left_join(all_pairs, comp_df, by = c("exon_5p","exon_3p"))
 
-  # Define Categories
+  # Define categories
   merged <- merged %>%
     mutate(Category = case_when(
       exon_5p == exon_3p         ~ "Self",
@@ -44,7 +44,7 @@ plot_grna_interactive <- function(exon_gr,
   merged$Category[merged$exon_5p %in% utr_exons |
                     merged$exon_3p %in% utr_exons] <- "UTR"
 
-  ## ---- Color map ----
+  ## ---- Colour map ----
   cat_levels <- c("Self","Contiguous","Compatible","Incompatible","UTR")
   cat_cols   <- c("grey70","palegreen3","goldenrod2","steelblue4","firebrick3")
 

@@ -1,6 +1,6 @@
-#' Check exon pair phase compatibility
+#' @title Check exon pair phase compatibility
 #'
-#' Determines which pairs of exons are phase-compatible, meaning that
+#' @description Determines which pairs of exons are phase-compatible, meaning that
 #' if the exons between them were deleted, the original reading frame would be preserved.
 #'
 #' @param exon_info data.frame or GRanges with columns `rank`, `start_phase`, `end_phase`.

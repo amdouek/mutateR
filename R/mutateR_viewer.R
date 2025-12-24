@@ -1,7 +1,8 @@
-#' Interactive viewer for mutateR gRNA design heatmaps
+#' @title Interactive viewer for mutateR gRNA design heatmaps
 #'
-#' Launches a small Shiny gadget showing the interactive Plotly heatmap.
-#' Clicking a cell filters the gRNA table below. Primer3-generated genotyping primers are displayed for each recommended gRNA pair.
+#' @description Launches a small Shiny gadget showing the interactive Plotly heatmap.
+#' Clicking a cell filters the gRNA table below.
+#' Primer3-generated genotyping primers are displayed for each recommended gRNA pair.
 #'
 #' @param plot_obj Plotly object returned in the mutateR output list
 #'                 (element \code{$plot}); must have attribute \code{"pairs_data"}.
@@ -45,7 +46,7 @@ mutateR_viewer <- function(plot_obj) {
           shiny::helpText("3. Select rows in table to export."),
           shiny::hr(),
 
-          # --- Export Section ---
+          # --- Export section ---
           shiny::h4("Data Export"),
           shiny::downloadButton("dl_csv", "Download Table (CSV)"),
           shiny::br(), shiny::br(),
@@ -81,7 +82,7 @@ mutateR_viewer <- function(plot_obj) {
         plot_obj
       })
 
-      # --- Heatmap Click Event ---
+      # --- Heatmap click event ---
       shiny::observeEvent(plotly::event_data("plotly_click", source = "mutateR_heatmap"), {
         click <- plotly::event_data("plotly_click", source = "mutateR_heatmap")
         if (is.null(click)) return()
@@ -122,7 +123,7 @@ mutateR_viewer <- function(plot_obj) {
         })
       })
 
-      # --- Data Table ---
+      # --- Data table ---
       output$pairs_tbl <- DT::renderDataTable({
         dat <- heatmap_filtered_data()
 
@@ -208,7 +209,7 @@ mutateR_viewer <- function(plot_obj) {
               Scale = "2nm", Purification = "STD"
             )
 
-            # --- External Primers (DNA) -- needed for all gRNA pairs ---
+            # --- External primers (DNA) -- needed for all gRNA pairs ---
             if ("primer_ext_fwd" %in% names(row) && !is.na(row$primer_ext_fwd)) {
               order_rows[[length(order_rows)+1]] <- data.frame(
                 Name = paste0(id_base, "_Prim_Ext_F"), Sequence = row$primer_ext_fwd,
@@ -220,7 +221,7 @@ mutateR_viewer <- function(plot_obj) {
               )
             }
 
-            # --- Internal Primers (DNA) - Strategy B (only for very large deletions) ---
+            # --- Internal primers (DNA) - Strategy B (only for very large deletions) ---
             if ("primer_int_fwd" %in% names(row) && !is.na(row$primer_int_fwd)) {
               order_rows[[length(order_rows)+1]] <- data.frame(
                 Name = paste0(id_base, "_Prim_Int_F"), Sequence = row$primer_int_fwd,

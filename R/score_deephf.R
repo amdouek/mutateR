@@ -1,7 +1,8 @@
-#' Internal function to run DeepHF via reticulate
+#' @title Run DeepHF Cas9 on-target scoring (via reticulate, internal function)
 #'
-#' This function implements the DeepHF on-target scoring method (Wang et al. 2019)
-#' for SpCas9 and high-fidelity variants. The architecture consists of:
+#' @description This function implements the DeepHF on-target scoring method (Wang et al. 2019)
+#' for SpCas9 and high-fidelity variants (eSpCas9(1.1) and SpCas9-HF1).
+#' The architecture consists of:
 #' - Bidirectional LSTM for sequence representation
 #' - 11 biological features (GC content, melting temperature, RNA structure)
 #' - Dense layers for final prediction
@@ -12,10 +13,11 @@
 #'   \item{wt_u6}{Optimised for U6 promoter-driven gRNA expression in mammalian cells.
 #'               Best for plasmid transfection, lentiviral delivery.}
 #'   \item{wt_t7}{Optimised for T7 promoter-driven in vitro transcribed gRNAs.
+#'                Trained on a zebrafish dataset (Moreno-Mateos et al. 2015 10.1038/nmeth.3543)
 #'               Best for RNP delivery with IVT gRNA, synthetic gRNA (sort of).
 #'               Note: For chemically synthesized gRNAs (e.g., IDT Alt-R), T7 model
 #'               is recommended over U6, though neither was specifically trained on
-#'               this delivery context.}
+#'               this delivery context - I will explore the relevance of this in future.}
 #'   \item{esp}{Model for eSpCas9(1.1) high-fidelity variant.}
 #'   \item{hf}{Model for SpCas9-HF1 high-fidelity variant.}
 #' }
@@ -25,14 +27,14 @@
 #' \itemize{
 #'   \item \strong{Plasmid/Lentiviral delivery}: Use \code{wt_u6}
 #'   \item \strong{RNP with IVT gRNA}: Use \code{wt_t7}
-#'   \item \strong{RNP with synthetic gRNA}: Use \code{wt_t7} (best approximation)
+#'   \item \strong{RNP with synthetic gRNA}: Use \code{wt_t7} (best approximation for now)
 #'   \item \strong{eSpCas9(1.1)}: Use \code{esp}
 #'   \item \strong{SpCas9-HF1}: Use \code{hf}
 #' }
 #'
 #' @param sequence_context Character vector of 23 bp sequences
-#'        (20bp protospacer + 3bp PAM). Alternatively, 30bp context sequences
-#'        (4bp 5' flank + 20bp protospacer + 3bp PAM + 3bp 3' flank) are accepted
+#'        (20 bp protospacer + 3 bp PAM). Alternatively, 30 bp context sequences
+#'        (4 bp 5' flank + 20 bp protospacer + 3 bp PAM + 3 bp 3' flank) are accepted
 #'        and will be automatically trimmed.
 #' @param deephf_var Character. One of "wt", "wt_u6" (default), "wt_t7", "esp", or "hf".
 #'
@@ -61,9 +63,9 @@ predict_deephf_python <- function(sequence_context,
   # --- 2. Validate and process sequence lengths ---
   seq_lengths <- nchar(sequence_context)
 
-  # Accept either 23bp (protospacer+PAM) or 30bp (full context)
+  # Accept either 23 bp (protospacer+PAM) or 30 bp (full context)
   if (all(seq_lengths == 30)) {
-    # Trim 30bp context to 23bp: remove 4bp 5' flank and 3bp 3' flank
+    # Trim 30 bp context to 23 bp: remove 4 bp 5' flank and 3 bp 3' flank
     message("Detected 30bp context sequences. Trimming to 23bp (protospacer + PAM).")
     sequence_context <- substring(sequence_context, 5, 27)
   } else if (all(seq_lengths == 23)) {
@@ -153,13 +155,12 @@ def make_embedding_data(sequences):
 
 
 # ============================================================================
-# BIOLOGICAL FEATURES - CORRECTED
+# BIOLOGICAL FEATURES
 # ============================================================================
 
 def dG_binding(seq):
     '''
     Calculate DNA:RNA binding free energy using nearest-neighbor model.
-    Matches original exactly.
     '''
     seq = seq.lower().replace('u', 't')
     dG_nn = {
@@ -183,11 +184,10 @@ def get_structure_features(seq_21mer):
     '''
     Calculate RNA secondary structure features using ViennaRNA.
 
-    CRITICAL FIX:
+    NOTE:
     - dG comes from folding the 20-mer ALONE
     - stem comes from folding the 99-mer (20mer + 79bp scaffold)
 
-    This matches the original implementation which calls RNAfold twice.
     '''
     # Original scaffold is 79 characters
     scaffold_seq = 'GTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGGCTAGTCCGTTATCAACTTGAAAAAGTGGCACCGAGTCGGTGCTTT'
@@ -200,27 +200,19 @@ def get_structure_features(seq_21mer):
     scaffold_rna = scaffold_seq.replace('T', 'U')
 
     # FOLD 1: 20-mer alone to get dG
-    # This matches the original: 'lst_0 = get_dG( bytes_list )[0]' which folds just the 20-mer
     (structure_20, dG) = RNA.fold(rna_20mer)
 
     # FOLD 2: 99-mer (20bp + 79bp scaffold) to get stem structure
-    # This matches the original: 'lst_1 = get_dG( bytes_list )[1]' which folds the full 99-mer
     full_rna = rna_20mer + scaffold_rna
     (structure_99, mfe_99) = RNA.fold(full_rna)
 
     # Check for canonical stem-loop structure in the 99-mer fold
-    # Original: align_seq = c[1][:99]; aligned_stem = align_seq[18:18+len(ext_stem)]
     ext_stem = '(((((((((.((((....))))...)))))))'
     aligned_stem = structure_99[18:18+len(ext_stem)] if len(structure_99) >= 18+len(ext_stem) else ''
     stem = 1 if ext_stem == aligned_stem else 0
 
     # Calculate binding energies
-    # Original: dG_binding_20 = dG_binding( a[0][1:21] ) where a[0] is FASTA header '>'+21mer
-    # So a[0][1:21] = first 20 chars of 21mer = the 20-mer
     dG_binding_20 = dG_binding(seq_20mer)
-
-    # Original: dg_binding_7to20 = dG_binding( a[0][8:21] )
-    # a[0][8:21] = positions 7-19 of the 21mer = 13 nucleotides
     dG_binding_7to20 = dG_binding(seq_21mer[7:20])
 
     return stem, dG, dG_binding_20, dG_binding_7to20
@@ -229,7 +221,6 @@ def get_structure_features(seq_21mer):
 def get_gc_features(seq_21mer):
     '''
     Calculate GC content features.
-    Original: countGC counts G+C in first 20 positions only.
     '''
     seq_20mer = seq_21mer[:20].upper()
     gc_count = seq_20mer.count('G') + seq_20mer.count('C')
@@ -443,7 +434,7 @@ validate_deephf <- function(deephf_var = "wt_u6") {
 
   # Test with known sequences
   tryCatch({
-    # Test sequences (23bp: 20bp protospacer + NGG)
+    # Test sequences (23 bp: 20 bp protospacer + NGG)
     test_seqs <- c(
       "ACGTGTGACTACCGGCGGCGCGG",
       "GGAAGTCTGGAGTCTCCAGGTGG"

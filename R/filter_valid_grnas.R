@@ -1,17 +1,17 @@
-#' Integrate gRNA scoring data with exon‑pair compatibility
+#' @title Integrate gRNA scoring data with exon‑pair compatibility
 #'
-#' Returns scored Cas9/Cas12a gRNAs that lie within exons
+#' @description Returns scored Cas9/Cas12a gRNAs that lie within exons
 #' participating in phase‑compatible exon pairs or predicted
 #' terminal‑exon PTC cases.
 #'
-#' @param exon_gr  GRanges from get_exon_structures(output="GRanges").
+#' @param exon_gr  GRanges. Returned by get_exon_structures(output="GRanges").
 #' @param genome   BSgenome object for the relevant species.
-#' @param species  Character, e.g. "hsapiens".
+#' @param species  Character, using short-form species name e.g. "hsapiens".
 #' @param nuclease Character. One of "Cas9", "Cas12a" or "enCas12a".
 #' @param score_method Character. One of "ruleset1", "azimuth", "deepspcas9",
 #'        "deephf", "ruleset3" (Cas9), "deepcpf1" (Cas12a), or "enpamgb" (enCas12a).
 #' @param scored_grnas Precomputed on-target scores passed from elsewhere (default NULL, evokes scoring).
-#' @param tracr Character, either "Chen2013" (default) or "Hsu2013" - only for ruleset3 scoring.
+#' @param tracr Character. Either "Chen2013" (default) or "Hsu2013" - only for ruleset3 scoring.
 #' @param deephf_var Character. For DeepHF scoring; one of "wt", "wt_u6" (default), "wt_t7", "esp", or "hf".
 #'        See \code{\link{recommend_deephf_model}} for guidance on model selection.
 #'
@@ -53,7 +53,7 @@ filter_valid_grnas <- function(exon_gr,
     message("Note: 'deephf_var' parameter is only used with score_method='deephf'. Ignoring.")
   }
 
-  ## ---- 0. Early‑exit for single‑exon and two‑exon transcripts ----------
+  ## ---- 0. Early‑exit for intragenic mode (single‑exon and two‑exon transcript edge cases) ----------
   n_exons <- length(exon_gr)
   if (n_exons <= 2) {
     warning("Transcript has ", n_exons, " exon(s). Skipping phase‑compatibility checks.")
@@ -77,7 +77,7 @@ filter_valid_grnas <- function(exon_gr,
     return(grna_sites)
   }
 
-  ## ---- 1. Exon info and pair classification --------------------------
+  ## ---- 1. Exon info and pair classification ----
   exon_meta <- as.data.frame(mcols(exon_gr))
   exon_meta$rank <- seq_len(nrow(exon_meta))
 
@@ -100,7 +100,7 @@ filter_valid_grnas <- function(exon_gr,
     pair_info$exon_3p[pair_info$compatible | pair_info$terminal_exon_case]
   ))
 
-  ## ---- 2. Collect and score gRNA sites -------------------------------
+  ## ---- 2. Collect and score gRNA sites ----
   if (!is.null(scored_grnas)) {
     # Use pre-scored gRNAs if provided
     grna_sites <- scored_grnas
@@ -123,14 +123,14 @@ filter_valid_grnas <- function(exon_gr,
                               deephf_var = deephf_var)
   }
 
-  ## ---- 3. Annotate exon rank if missing -------------------------------
+  ## ---- 3. Annotate exon rank if missing ----
   if (!"exon_rank" %in% names(mcols(grna_sites))) {
     hits <- GenomicRanges::findOverlaps(grna_sites, exon_gr)
     grna_sites$exon_rank <- NA_integer_
     grna_sites$exon_rank[queryHits(hits)] <- exon_meta$rank[subjectHits(hits)]
   }
 
-  ## ---- 4. Filter to allowed exon ranks -------------------------------
+  ## ---- 4. Filter to allowed exon ranks ----
   valid <- grna_sites[grna_sites$exon_rank %in% accepted_exons]
 
   message("Retained ", length(valid),

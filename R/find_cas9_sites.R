@@ -1,6 +1,6 @@
-#' Find Cas9 target sites in exons
+#' @title Find Cas9 target sites in exons
 #'
-#' Scans exon sequences on both strands for NGG PAMs.
+#' @description Scans exon sequences on both strands for NGG PAMs.
 #' Excludes gRNA sequences where the flanking -4/+3 nucleotides would run out of an exon boundary (for on-target scoring purposes).
 #' Outputs both + and - strand hits, each with a correctly oriented 30‑nt
 #' sequence_context = [4-nt flank][20-nt protospacer][3-nt PAM][3-nt flank].
@@ -71,7 +71,7 @@ find_cas9_sites <- function(exon_gr,
         right_bound <- pam_end + 3                            # inclusive
         if (left_bound < 1 || right_bound > exon_len) next     # skip out-of-exon-bound cases
 
-        # ----- extract protospacer and PAM in this scanning orientation -----
+        # ----- Extract protospacer and PAM in this scanning orientation -----
         protospacer <- Biostrings::subseq(seq_to_scan,
                                           pam_start - protospacer_length,
                                           pam_start - 1)

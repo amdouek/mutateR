@@ -1,10 +1,11 @@
-#' On-target scoring for gRNAs
+#' @title On-target scoring for gRNAs
 #'
+#' @description Performs on-target scoring for gRNAs using selected methods for the relevant nuclease.
 #' Currently handles RuleSet1 and Azimuth (Cas9), DeepSpCas9 (Cas9), RuleSet 3 (Cas9),
 #' DeepHF (Cas9/eSpCas9/SpCas9-HF1), DeepCpf1 (Cas12a), and enPAM+GB (Cas12a/enCas12a).
 #'
-#' @param grna_gr GRanges returned by find_cas9_sites() or find_cas12a_sites().
-#' @param method Scoring model name. Default "ruleset1".
+#' @param grna_gr GRanges. Returned by find_cas9_sites() or find_cas12a_sites().
+#' @param method Character. Scoring model name. Default "ruleset1".
 #' @param tracr Character. For Rule Set 3 scoring; one of "Chen2013" (default) or "Hsu2013".
 #' @param deephf_var Character. For DeepHF scoring; one of "wt", "wt_u6" (default), "wt_t7", "esp", or "hf".
 #'        See \code{\link{recommend_deephf_model}} for guidance on model selection.
@@ -33,7 +34,7 @@ score_grnas <- function(grna_gr,
   method <- match.arg(method)
   deephf_var <- match.arg(deephf_var)
 
-  # ---- 1. Basic Validation ----------------------------------------
+  # ---- 1. Basic Validation ----
   if (!inherits(grna_gr, "GRanges")) stop("Input must be a GRanges object.")
   if (!"sequence_context" %in% names(mcols(grna_gr))) stop("GRanges must contain 'sequence_context' column.")
 
@@ -56,7 +57,7 @@ score_grnas <- function(grna_gr,
 
   scores_raw <- NULL
 
-  # ---- 2. SpCas9 Models (Probability-based) -----------------------
+  # ---- 2. SpCas9 Models (Probability-based) ----
   # Rule Set 1
   if (tolower(method) == "ruleset1") {
     if (!requireNamespace("crisprScore", quietly = TRUE)) stop("crisprScore required.")
@@ -92,7 +93,7 @@ score_grnas <- function(grna_gr,
     })
   }
 
-  # ---- 3. DeepSpCas9 (via Python backend) ---------------
+  # ---- 3. DeepSpCas9 (via Python backend) ----
   if (tolower(method) == "deepspcas9") {
     message("Using mutateR internal Python backend for DeepSpCas9...")
 
@@ -109,7 +110,7 @@ score_grnas <- function(grna_gr,
     })
   }
 
-  # ---- 4. DeepHF (via Python backend) ---------------------------------
+  # ---- 4. DeepHF (via Python backend) ----
   if (tolower(method) == "deephf") {
     message("Using mutateR internal Python backend for DeepHF (variant: ", deephf_var, ")...")
 
@@ -133,7 +134,7 @@ score_grnas <- function(grna_gr,
     }
   }
 
-  # ---- 5. Cas12a Models --------------------------------
+  # ---- 5. Cas12a Models ----
   # DeepCpf1 (via Python backend)
   if (tolower(method) == "deepcpf1") {
     message("Using mutateR internal Python backend for DeepCpf1...")
@@ -168,7 +169,7 @@ score_grnas <- function(grna_gr,
     })
   }
 
-  # ---- 6. Final Formatting ----------------------------------------
+  # ---- 6. Final Formatting ----
   mcols(grna_gr)$ontarget_score <- extract_numeric_scores(scores_raw)
   mcols(grna_gr)$scoring_method <- method
 

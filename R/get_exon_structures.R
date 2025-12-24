@@ -1,6 +1,6 @@
-#' Get exon structures for a specified transcript
+#' @title Get exon structures for a specified transcript
 #'
-#' Retrieves exon coordinates, reading frame phases, transcript CDS length,
+#' @description Retrieves exon coordinates, reading frame phases, transcript CDS length,
 #' and exon-specific coding lengths for each exon of a transcript.
 #'
 #' @param transcript_id Character. Ensembl transcript ID.
