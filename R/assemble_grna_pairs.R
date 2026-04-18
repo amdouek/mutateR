@@ -11,6 +11,34 @@
 #' @param transcript_id Character. Ensembl transcript ID.
 #' @param species Character. Ensembl species short code.
 #' @param score_cutoff Numeric. Optional. If NULL, auto-selects based on `scoring_method` metadata.
+#' @param min_pair_specificity Numeric. Minimum pair-level specificity score
+#'   (0-100, default 10) for a pair to receive the \code{recommended} flag.
+#'   Computed via the additive off-target burden model: each guide's expected
+#'   off-target burden \code{S = 100/specificity - 1} is summed, and pair
+#'   specificity is \code{100 / (1 + S_5p + S_3p)}. This is more stringent
+#'   than \code{pmin()} for balanced pairs (correctly reflecting doubled burden)
+#'   and more lenient for asymmetric pairs (crediting a strong partner).
+#'   A threshold of 10 accepts median-quality pairings while rejecting pairs
+#'   where both guides are below-average. The formula implies an individual
+#'   floor: no guide with specificity below ~\code{min_pair_specificity} can
+#'   contribute to a passing pair regardless of partner quality.
+#'   Ignored when off-target scoring was not performed (specificity columns
+#'   are NA). See the package README for detailed derivation and calibration.
+#'
+#' @details
+#' \strong{Pair specificity scoring.}
+#' Off-target risk in a two-guide experiment is additive: each gRNA independently
+#' creates DSBs at off-target loci, and a highly specific partner provides no
+#' protection against the other guide's off-target activity. The pair specificity
+#' is therefore derived from the summed off-target burden of both guides:
+#'
+#' \deqn{S_{pair} = S_{5'} + S_{3'} = \frac{100}{spec_{5'}} - 1 + \frac{100}{spec_{3'}} - 1}
+#' \deqn{pair\_specificity = \frac{100}{1 + S_{pair}} = \frac{100}{\frac{100}{spec_{5'}} + \frac{100}{spec_{3'}} - 1}}
+#'
+#' This formula is more stringent than \code{pmin()} for balanced pairs
+#' (two 50-scoring guides yield pair specificity 33.3, correctly reflecting
+#' doubled off-target burden) and more lenient for asymmetric pairs
+#' (a 45/90 pair scores 42.9 rather than being capped at 45).
 #'
 #' @return A \code{data.frame} of candidate exon‑flanking gRNA pairs.
 #' @export
@@ -18,7 +46,8 @@ assemble_grna_pairs <- function(grna_gr,
                                 exon_gr,
                                 transcript_id,
                                 species,
-                                score_cutoff = NULL) {
+                                score_cutoff = NULL,
+                                min_pair_specificity = 10) {
 
   stopifnot(inherits(grna_gr, "GRanges"))
   message("Assembling gRNA pairs for exon‑flanking deletions...")
@@ -89,9 +118,21 @@ assemble_grna_pairs <- function(grna_gr,
       stringsAsFactors = FALSE
     )
 
+    # Ensure off-target columns exist (NA if off-target scoring was not run)
+    if (!"specificity_score_5p" %in% names(intragenic)) intragenic$specificity_score_5p <- NA_real_
+    if (!"specificity_score_3p" %in% names(intragenic)) intragenic$specificity_score_3p <- NA_real_
+    if (!"n_offtargets_5p" %in% names(intragenic)) intragenic$n_offtargets_5p <- NA_integer_
+    if (!"n_offtargets_3p" %in% names(intragenic)) intragenic$n_offtargets_3p <- NA_integer_
+
+    intragenic$pair_specificity <- compute_pair_specificity(
+      intragenic$specificity_score_5p,
+      intragenic$specificity_score_3p
+    )
+
     intragenic$recommended <- with(intragenic,
                                    ontarget_score_5p >= score_cutoff &
-                                     ontarget_score_3p >= score_cutoff)
+                                     ontarget_score_3p >= score_cutoff &
+                                     (is.na(pair_specificity) | pair_specificity >= min_pair_specificity))
 
     return(list(pairs = intragenic[intragenic$recommended == TRUE, ], intragenic_mode = TRUE))
   }
@@ -194,17 +235,37 @@ assemble_grna_pairs <- function(grna_gr,
 
   if (nrow(out) == 0) return(NULL)
 
-  # 'Recommended' logic
+  # Ensure off-target columns exist (NA if off-target scoring was not run)
+  if (!"specificity_score_5p" %in% names(out)) out$specificity_score_5p <- NA_real_
+  if (!"specificity_score_3p" %in% names(out)) out$specificity_score_3p <- NA_real_
+  if (!"n_offtargets_5p" %in% names(out)) out$n_offtargets_5p <- NA_integer_
+  if (!"n_offtargets_3p" %in% names(out)) out$n_offtargets_3p <- NA_integer_
+
+  # Pair-level specificity via additive off-target burden model
+  # S = 100/spec - 1 (per-guide expected off-target cuts)
+  # pair_spec = 100 / (1 + S_5p + S_3p)
+  # See compute_pair_specificity() in ot_utils.R for details
+  out$pair_specificity <- compute_pair_specificity(
+    out$specificity_score_5p,
+    out$specificity_score_3p
+  )
+
+  # Recommended: on-target scores pass method cutoff AND pair specificity passes threshold
+  # is.na() guard preserves backwards compatibility when off-target scoring is skipped
   out$recommended <- with(out,
                           !is.na(ontarget_score_5p) & ontarget_score_5p >= score_cutoff &
-                            !is.na(ontarget_score_3p) & ontarget_score_3p >= score_cutoff)
+                            !is.na(ontarget_score_3p) & ontarget_score_3p >= score_cutoff &
+                            (is.na(pair_specificity) | pair_specificity >= min_pair_specificity))
 
   # Keep columns
   keep_cols <- c("upstream_pair","downstream_pair","exon_5p","exon_3p",
                  "compatible","frameshift","ptc_flag","terminal_exon_case",
                  "genomic_deletion_size", "transcript_deletion_size",
                  "protospacer_sequence_5p","pam_sequence_5p", "ontarget_score_5p",
+                 "specificity_score_5p", "n_offtargets_5p",
                  "protospacer_sequence_3p","pam_sequence_3p", "ontarget_score_3p",
+                 "specificity_score_3p", "n_offtargets_3p",
+                 "pair_specificity",
                  "domains","recommended",
                  "seqnames_5p", "start_5p", "end_5p", "cut_site_5p",
                  "seqnames_3p", "start_3p", "end_3p", "cut_site_3p")

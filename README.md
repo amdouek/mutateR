@@ -1,7 +1,7 @@
 mutateR
 ================
 Alon M Douek
-2025-12-06
+2026-04-19
 
 - [Overview](#overview)
   - [Background](#background)
@@ -17,12 +17,15 @@ Alon M Douek
   - [Interpreting the `run_mutateR()`
     output](#interpreting-the-run_mutater-output)
   - [A note on primer design](#a-note-on-primer-design)
+  - [Off-target scoring](#off-target-scoring)
   - [Special cases](#special-cases)
 - [Using the `mutateR_viewer`](#using-the-mutater_viewer)
 - [Manual function execution](#manual-function-execution)
 - [To be implemented](#to-be-implemented)
 - [Session information](#session-information)
 - [References](#references)
+
+![](logo.jpg)
 
 ## Overview
 
@@ -42,7 +45,7 @@ The underlying motivation is to facilitate the generation of mutant
 alleles that are not prone to nonsense-mediated decay (NMD), which can
 induce transcriptional adaptive responses ([El-Brolosy et al., *Nature*
 (2019)](https://doi.org/10.1038/s41586-019-1064-z "Genetic compensation triggered by mutant mRNA degradation")
-and [Ma et al., Nature
+and [Ma et al., *Nature*
 (2019)](https://www.nature.com/articles/s41586-019-1057-y "PTC-bearing mRNA elicits a genetic compensation response via Upf3a and COMPASS components")).
 This behaviour can attenuate the phenotypic potency of mutant alleles,
 making the study of gene loss-of-function more difficult.
@@ -83,7 +86,7 @@ has a largely “normal” brain!), it means that we can’t really use our
 Gene A mutant to reliably study the effects of loss of Gene A function.
 
 **An important caveat:** Transcriptional adaptation is not universal
-(i.e., some genes are more prone to this behaviour than others, and it
+(*i.e.*, some genes are more prone to this behaviour than others, and it
 is observed more frequently in some biological contexts than in others).
 While `mutateR` assumes that your gene of interest is prone to
 transcriptional adaptation when recommending gRNA pairs, you should
@@ -120,7 +123,7 @@ joined together by DNA repair mechanisms.
 
 ## How does `mutateR` work?
 
-`mutateR` uses `biomaRt` to retrieve transcript and exon phase
+`mutateR` calls `biomaRt` to retrieve transcript and exon phase
 information for your gene of interest, then calculates which pairs of
 non-contiguous exons are phase-compatible. It then scans these exons for
 Cas effector PAMs (currently Cas9 NGG and Cas12a TTTV) associated with
@@ -130,13 +133,16 @@ After calculating on-target scores for potential gRNAs using rule sets
 from `crisprScore` ([Hoberecht et al., *Nature Communications*
 (2022)](https://www.nature.com/articles/s41467-022-34320-7 "A comprehensive Bioconductor ecosystem for the design of CRISPR guide RNAs across nucleases and technologies"))
 where possible, or by manual re-implementation of methods not available
-from `crisprScore`, `mutateR` returns recommended gRNA pairs to target
-exons where the flanking exons are in-frame with each other.
+from `crisprScore`, `mutateR` performs genome-wide off-target analysis
+and computes per-gRNA specificity scores. It then returns recommended
+gRNA pairs to target exons where the flanking exons are in-frame with
+each other, filtering for both on-target activity and off-target
+specificity.
 
 It also produces a graphical representation of the selected transcript,
 its phase-compatible exons, and the recommended exon pairs for
-targeting. Successful `mutateR` pipeline executions can now be passed to
-the `mutateR_viewer()` function for further inspection in an interactive
+targeting. Successful `mutateR` pipeline executions can be passed to the
+`mutateR_viewer()` function for further inspection in an interactive
 Shiny app.
 
 > As of December 2025, `mutateR` utilises a Python backend (via
@@ -154,7 +160,7 @@ Shiny app.
 > (\[Setting up the mutateR Python backend\]) below for more
 > information.
 
-The `mutateR` package consists of the following ordered functions:
+The `mutateR` pipeline consists of the following ordered main functions:
 
 | Step | Function | Functionality |
 |----|----|----|
@@ -164,13 +170,19 @@ The `mutateR` package consists of the following ordered functions:
 | 4 | `check_exon_phase()` | Determine phase-compatible exon pairs. |
 | 5 | `check_frameshift_ptc()` | Calculate and flag frameshift/PTC consequences. |
 | 6 | `map_protein_domains()` | Retrieve protein domain annotations from InterPro corresponding to exons. |
-| 7 | `score_grnas()` | Score guide RNAs via `crisprScore`. |
-| 8 | `filter_valid_grnas()` and `assemble_grna_pairs()` | Filter allowed gRNA pairs and assemble into a readable data.frame. |
-| 9 | `plot_grna_design()` | Visualise phase compatibility of non-contiguous exon pairs and top-ranked valid gRNA pairs. |
-| 10 | `plot_grna_heatmap()` | Helper function for `plot_grna_design()` but can be executed separately. |
-| 11 | `plot_grna_interactive()` | Helper function for interactive plotting mode. |
-| 12 | `run_mutateR()` | Wrapper; runs entire pipeline. |
-| 13 | `mutateR_viewer()` | Launches an Shiny app for gRNA extraction from an interactive heatmap. |
+| 7 | `score_grnas()` | On-target scoring with a specified method (see [gRNA scoring](#grna-scoring)). |
+| 8 | `score_offtargets()` | Genome-wide off-target specificity scoring (see [Off-target scoring](#off-target-scoring)). |
+| 9 | `filter_valid_grnas()` and `assemble_grna_pairs()` | Filter allowed gRNA pairs and assemble into a readable data.frame. |
+| 10 | `plot_grna_design()` | Visualise phase compatibility of non-contiguous exon pairs and top-ranked valid gRNA pairs. |
+| 11 | `plot_grna_heatmap()` | Helper function for `plot_grna_design()` but can be executed separately. |
+| 12 | `plot_grna_interactive()` | Helper function for interactive plotting mode. |
+| 13 | `run_mutateR()` | Wrapper; runs entire pipeline. |
+| 14 | `mutateR_viewer()` | Launches a Shiny app for gRNA extraction from an interactive heatmap. |
+
+> Note: In `hybrid` off-target mode, `refine_with_bulges()` runs as an
+> additional refinement step after pair assembly (Step 9), updating
+> specificity scores for recommended gRNA pairs using CRISPRitz bulge
+> search before visualisation.
 
 `mutateR` also has an additional function, `design_grna_pairs()`, that
 is not included in the wrapper function. This function can be used in
@@ -192,7 +204,7 @@ library(mutateR)
 
 Running `mutateR` requires only installation of the package itself, and
 that you have also installed the `BSgenome` R package for your species
-of interest (e.g., `BSgenome.Hsapiens.UCSC.hg38` for human). These
+of interest (*e.g.*, `BSgenome.Hsapiens.UCSC.hg38` for human). These
 BSgenome data packages can be quite large, so are not installed
 alongside `mutateR`.
 
@@ -220,9 +232,29 @@ alongside `mutateR`.
 > You can also see all genomes currently available through `BSgenome` by
 > running `BSgenome::available.genomes()`.
 
+#### Off-target scoring dependencies
+
+Off-target scoring with the default **Bowtie backend** requires three
+additional Bioconductor packages: `crisprBowtie`, `Rbowtie`, and
+`crisprBase`. These are listed in `Suggests` and will produce an
+informative error message if missing when off-target scoring is first
+invoked. Install them with:
+
+``` r
+BiocManager::install(c("crisprBowtie", "Rbowtie", "crisprBase"))
+```
+
+The first off-target run also triggers a one-time Bowtie index build for
+your genome (~10-15 minutes for hg38, ~2.5 GB disk). This is cached
+persistently and reused in all future sessions.
+
+> **Important**: The CRISPRitz backend (experimental) has additional
+> requirements - see [CRISPRitz backend
+> (experimental)](#crispritz-backend-experimental) for details.
+
 ### Setting up the `mutateR` Python backend
 
-In order to use the full suite of functionalities in `mutateR` (e.g.,
+In order to use the full suite of functionalities in `mutateR` (*e.g.*,
 automated genotyping primer design, all gRNA on-target scoring methods),
 you must install and activate the package’s Conda environment. This env
 contains all the necessary dependencies for Python-reliant package
@@ -250,11 +282,12 @@ loading the `mutateR` package, simply run the command
 
 This command will create an env called `r-mutater` with the specified
 `python_version` containing the following dependencies:
-`"tensorflow-cpu", "numpy<2", "h5py", "pandas", "scipy", "primer3-py"`.
+`"tensorflow-cpu==2.15.0", "numpy<2", "h5py", "pandas", "scipy", "primer3-py", "rs3", "scikit-learn", "biopython", "viennarna"`.
 
 If for whatever reason the env has not been installed correctly (or if a
-new dependency has been added), rerun the installation with the
-parameter `fresh = TRUE` to remove and reinstall the env.
+new dependency has been added since you last installed the package),
+rerun the installation with the parameter `fresh = TRUE` to remove and
+reinstall the env.
 
 **Important:** Restart your R session (Ctrl/Cmd + Shift + F10) after
 installation is complete.
@@ -265,8 +298,8 @@ After **restarting your R session**, run `activate_mutater_env()` to
 point your R session to the `r-mutater` env. `reticulate`’s default env
 is `RETICULATE_PYTHON`; `activate_mutater_env()` will unset this and set
 it as `r-mutater`. This will only last for the current R session and
-will revert to the default upon session restart (i.e., you will need to
-reactivate the env each time you initiate a new session, but you will
+will revert to the default upon session restart (*i.e.*, you will need
+to reactivate the env each time you initiate a new session, but you will
 only need to *reinstall* the env if a new dependency is added or if it
 is corrupted).
 
@@ -277,12 +310,13 @@ suite of `mutateR` functionalities.
 ## The `mutateR` workflow
 
 In the below example run, we will run `mutateR` on human *TP53* to
-select optimal Cas9 gRNA pairs*.* Assuming you have installed both
+select optimal Cas9 gRNA pairs. Assuming you have installed both
 `mutateR` and your BSgenome of choice (in this case, human), and set up
 the Python backend correctly:
 
 ``` r
 library(reticulate)
+#> Warning: package 'reticulate' was built under R version 4.5.3
 library(mutateR)
 library(BSgenome.Hsapiens.UCSC.hg38)
 
@@ -301,22 +335,26 @@ tp53_res <- run_mutateR(
   nuclease = "Cas9",
   score_method = 'ruleset1',
   design_primers = TRUE,
+  offtarget = FALSE,
   quiet = FALSE,
   plot_mode = 'heat'
   )
+#> Warning: package 'purrr' was built under R version 4.5.3
 #> Retrieving gene/transcript information...
 #> Using transcript: ENST00000269305 for gene: TP53
-#> Locating Cas9 target sites...
+#> Locating Cas9 target sites (PAM: NGG)...
 #> PAM distribution:
 #> 
 #> AGG CGG GGG TGG 
 #> 104  39 133 123
 #> Scoring gRNAs using model: ruleset1
-#> Computing on‑target scores using ruleset1 model...
+#> Computing on-target scores using ruleset1 model...
 #> Scored 399 guides using ruleset1.
 #> Assembling valid gRNA pairs for TP53 ...
 #> Assembling gRNA pairs for exon‑flanking deletions...
-#> Detected probability-based scores (e.g. ruleset1). Using default cutoff: 0.5
+#> Detected probability-like scores (ruleset1). Using default cutoff: 0.5
+#> Ensembl site unresponsive, trying asia mirror
+#> Ensembl site unresponsive, trying useast mirror
 #> Retrieving InterPro domain annotations from Ensembl Genes mart...
 #> Generated 2784 candidate exon‑flanking gRNA pairs.
 #> Designing genotyping primers for 35 recommended pairs...
@@ -326,9 +364,18 @@ tp53_res <- run_mutateR(
 #> Mapping results to dataframe...
 #> Designed primers for 35/35 pairs.
 #> Plotting exon phase compatibility and gRNA pairs...
+#> Ensembl site unresponsive, trying useast mirror
 #> Retrieving Pfam domain annotations from Ensembl Genes mart...
-#> mutateR pipeline completed for TP53, finding 2784 gRNA pairs.
+#> mutateR pipeline completed for TP53 (Cas9/ruleset1, off-target: skipped), finding 2784 gRNA pairs.
 ```
+
+> In this example, off-target scoring is disabled (`offtarget = FALSE`)
+> for speed. When enabled (which it is by default), `run_mutateR()`
+> performs genome-wide off-target analysis using the Bowtie backend,
+> typically completing in under a minute for hundreds of guides **once
+> the one-time index build is cached**. See [Off-target
+> scoring](#off-target-scoring) for full details on backends and
+> configuration.
 
 > Note that this function also reports a PAM distribution. In the case
 > of *TP53*, CGG PAMs are significantly underrepresented amongst those
@@ -342,8 +389,11 @@ The object `tp53_res` is a list with the following levels:
 
 ``` r
 names(tp53_res)
-#> [1] "gene_id"       "gene_symbol"   "transcript_id" "exons"        
-#> [5] "scored_grnas"  "pairs"         "plot"
+#>  [1] "gene_id"                "gene_symbol"            "transcript_id"         
+#>  [4] "nuclease"               "score_method"           "deephf_var"            
+#>  [7] "ot_backend"             "exons"                  "scored_grnas"          
+#> [10] "offtarget_details"      "offtarget_details_path" "ot_detail_level"       
+#> [13] "pairs"                  "plot"
 ```
 
 With the actual selected gRNA pairs (with associated metadata) stashed
@@ -484,6 +534,31 @@ transcript_deletion_size
 <th style="text-align:left;">
 
 domains
+</th>
+
+<th style="text-align:right;">
+
+specificity_score_5p
+</th>
+
+<th style="text-align:right;">
+
+specificity_score_3p
+</th>
+
+<th style="text-align:right;">
+
+n_offtargets_5p
+</th>
+
+<th style="text-align:right;">
+
+n_offtargets_3p
+</th>
+
+<th style="text-align:right;">
+
+pair_specificity
 </th>
 
 <th style="text-align:left;">
@@ -665,6 +740,31 @@ p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
 p53/RUNT-type_TF_DNA-bd_sf
 </td>
 
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
 <td style="text-align:left;">
 
 TRUE
@@ -838,6 +938,31 @@ FALSE
 
 p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
 p53/RUNT-type_TF_DNA-bd_sf
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
 </td>
 
 <td style="text-align:left;">
@@ -1015,6 +1140,31 @@ p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
 p53/RUNT-type_TF_DNA-bd_sf
 </td>
 
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
 <td style="text-align:left;">
 
 TRUE
@@ -1190,6 +1340,31 @@ p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
 p53/RUNT-type_TF_DNA-bd_sf
 </td>
 
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
 <td style="text-align:left;">
 
 TRUE
@@ -1363,6 +1538,31 @@ FALSE
 
 p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
 p53/RUNT-type_TF_DNA-bd_sf
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
 </td>
 
 <td style="text-align:left;">
@@ -1560,6 +1760,31 @@ transcript_deletion_size
 domains
 </th>
 
+<th style="text-align:right;">
+
+specificity_score_5p
+</th>
+
+<th style="text-align:right;">
+
+specificity_score_3p
+</th>
+
+<th style="text-align:right;">
+
+n_offtargets_5p
+</th>
+
+<th style="text-align:right;">
+
+n_offtargets_3p
+</th>
+
+<th style="text-align:right;">
+
+pair_specificity
+</th>
+
 <th style="text-align:left;">
 
 recommended
@@ -1739,6 +1964,31 @@ p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
 p53/RUNT-type_TF_DNA-bd_sf
 </td>
 
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
 <td style="text-align:left;">
 
 TRUE
@@ -1912,6 +2162,31 @@ FALSE
 
 p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
 p53/RUNT-type_TF_DNA-bd_sf
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
 </td>
 
 <td style="text-align:left;">
@@ -2089,6 +2364,31 @@ p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
 p53/RUNT-type_TF_DNA-bd_sf
 </td>
 
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
 <td style="text-align:left;">
 
 TRUE
@@ -2262,6 +2562,31 @@ FALSE
 
 p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
 p53/RUNT-type_TF_DNA-bd_sf
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
 </td>
 
 <td style="text-align:left;">
@@ -2439,6 +2764,31 @@ p53_tumour_suppressor; p53_DNA-bd; p53-like_TF_DNA-bd_sf; p53_TAD2;
 p53/RUNT-type_TF_DNA-bd_sf
 </td>
 
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
 <td style="text-align:left;">
 
 TRUE
@@ -2497,7 +2847,7 @@ NA
 #### The `pairs` data.frame
 
 `$pairs` contains several columns - some of these are not strictly
-useful for the end-user (e.g. genomic coordinates), but most represent
+useful for the end-user (*e.g.* genomic coordinates), but most represent
 the primary output of the pipeline. The below sections will elaborate on
 these:
 
@@ -2518,7 +2868,7 @@ values to be `TRUE`. The `terminal_exon_case` flag is used for a special
 case, where a frameshift has introduced a PTC into the terminal exon of
 the selected transcript. Final-exon PTCs induce NMD with far lower
 efficiency than those in non-terminal exons, and are significantly less
-likely to result in transcriptional compensatory behaviour.
+likely to result in transcriptional adaptive behaviour.
 
 ##### gRNA pairs and associated deletion sizes
 
@@ -2538,9 +2888,9 @@ transcript level is reported in `genomic_deletion_size` and
 
 ##### Genotyping primers and amplicon sizes
 
-`run_mutateR()` now also automatically generates a pair (or two,
+`run_mutateR()` now also automatically generates a pair (or two pairs,
 depending on the nature of the deletion - see [A note on primer
-design](#a-note-on-primer-design) below) of primers for genotyping the
+design](#a-note-on-primer-design)) of primers for genotyping the
 resulting deletion produced by the gRNA targeting. `priming_strategy`
 reports the genotyping approach used (either ‘Flanking’ \[one primer
 pair\] or ‘Dual Pair’ \[two primer pairs\]); `primer_ext_fwd` and
@@ -2549,21 +2899,24 @@ pair\] or ‘Dual Pair’ \[two primer pairs\]); `primer_ext_fwd` and
 within the deleted region (Dual Pair only). `exp_wt_size` reports the
 expected wild type amplicon size, and `exp_mut_size` the expected mutant
 amplicon size from the flanking primers. `exp_int_size` reports the
-amplicon size for the nested primer pair.
+amplicon size for the nested (internal) primer pair.
 
 ##### gRNA scoring
 
-The currently working scoring methods are `"ruleset1"` and
-`"deepspcas9"` for Cas9, and `"deepcpf1"` for Cas12a. More will be added
-over time!
+The currently implemented scoring methods are `"ruleset1"`,
+`"ruleset3"`, `"deephf"`, and `"deepspcas9"` for Cas9, and `"deepcpf1"`
+and `"enpamgb"`, for Cas12a.
 
 `ruleset1` is implemented via `crisprScore` and works in an R-only
-environment, but the latter two require activation of the `r-mutater`
-Python env. The weights for the deep learning-based methods can be found
-in `inst/extdata`. Please note that in the context of `mutateR`,
-`deepcpf1` refers to the
-[Seq-DeepCpf1](https://www.nature.com/articles/nbt.4061) model
-(sequence-only, without training on chromatin accessibility
+environment, but the others require activation of the `r-mutater` Python
+env. **While `crisprScore` itself has implemented all of the above
+methods, it has only done so for macOS and Linux systems - I have
+reimplemented them here for Windows users as well.**
+
+The weights for the deep learning-based methods can be found in
+`inst/extdata`. Please note that in the context of `mutateR`, `deepcpf1`
+refers to the [Seq-DeepCpf1](https://www.nature.com/articles/nbt.4061)
+model (sequence-only, without training on chromatin accessibility
 information).
 
 > Please also note that the authors of
@@ -2578,18 +2931,50 @@ information).
 Each 5-prime and 3-prime gRNA sequence also has corresponding
 `ontarget_score` relating to whatever scoring method you selected when
 executing `run_mutateR()`. Note that the nature of the score will differ
-between methods (e.g., `"ruleset1"` reports a probability value between
-0-1, while `"deepspcas9"` reports a scalar linear regression value
-(usually 0-100, occasionally negative).
+between methods (*e.g.*, `"ruleset1"` reports a probability value
+between 0-1, while `"deepspcas9"` reports a scalar linear regression
+value (usually 0-100, occasionally negative).
+
+##### Off-target specificity
+
+When off-target scoring is enabled (the default), each gRNA pair also
+carries specificity metadata:
+
+- `specificity_score_5p` and `specificity_score_3p` report the per-gRNA
+  MIT-style specificity score (0–100 scale). A score of 100 means no
+  off-target hits were found; lower values indicate increasing
+  off-target risk. These are computed from the aggregate CFD (Cutting
+  Frequency Determination) scores of all genome-wide off-target hits
+  ([Hsu et al., *Nature Biotechnology*
+  (2013)](https://doi.org/10.1038/nbt.2647)).
+
+- `pair_specificity` is the combined pair-level specificity, reflecting
+  the fact that in a two-guide deletion experiment, off-target damage
+  from each gRNA is independent and additive. This score accounts for
+  the total off-target burden from *both* guides and is more informative
+  than simply taking the minimum of the two individual scores.
+
+- `n_offtargets_5p` and `n_offtargets_3p` report the number of
+  off-target hits with meaningful CFD scores (\> 0.01) for each gRNA.
+
+When off-target scoring was not performed (`offtarget = FALSE`) or a
+backend failure occurred, these columns will contain `NA` values. Guides
+that were identified as repeat-rich (*e.g.*, targeting Alu/SINE
+elements) and quarantined during CRISPRitz analysis receive a
+specificity score of 0.
 
 ##### Other
 
 `domains` contains protein domain annotations corresponding to the
-region to be deleted derived from the `map_protein_domains()` function,
-while the `recommended` flag is `TRUE` if the gRNA pair meets all
-validity criteria (including both gRNAs passing the on-target scoring
-threshold). Importantly, genotyping primers are only generated for
-recommended gRNA pairs.
+region to be deleted derived from the `map_protein_domains()` function.
+The `recommended` flag is `TRUE` if the gRNA pair meets all validity
+criteria: Both gRNAs must pass the on-target scoring threshold, and the
+pair must meet the minimum pair specificity threshold
+(`min_pair_specificity`, default `10`) when off-target scoring is
+enabled. Pairs where off-target scoring was unavailable (`NA`
+specificity) are given the benefit of the doubt and are not penalised.
+Importantly, genotyping primers are only generated for recommended gRNA
+pairs.
 
 #### Visualisation
 
@@ -2628,13 +3013,14 @@ tp53_arc <- run_mutateR(
   genome = BSgenome.Hsapiens.UCSC.hg38,
   nuclease = "Cas9",
   score_method = 'ruleset1',
+  offtarget = FALSE,
   design_primers = FALSE,
   top_n = NULL,
   quiet = TRUE,
   plot_mode = 'arc'
   )
 #> Assembling gRNA pairs for exon‑flanking deletions...
-#> Detected probability-based scores (e.g. ruleset1). Using default cutoff: 0.5
+#> Detected probability-like scores (ruleset1). Using default cutoff: 0.5
 #> Retrieving InterPro domain annotations from Ensembl Genes mart...
 #> Generated 2784 candidate exon‑flanking gRNA pairs.
 #> Plotting exon phase compatibility and gRNA pairs...
@@ -2649,7 +3035,7 @@ tp53_arc$plot
 `mutateR` now offers an interactive heatmap plotting mode which can be
 evoked by specifying `interactive = TRUE` inside `run_mutateR()`.
 Hovering over a cell in the heatmap will report metadata for that exon
-pair in a tooltip (e.g., whether the exon pair is (in)compatible, how
+pair in a tooltip (*e.g.*, whether the exon pair is (in)compatible, how
 many gRNA pairs exist for that exon pair, etc.). This visualisation mode
 is used as the basis for the much more useful `mutateR_viewer` Shiny app
 (see below).
@@ -2685,11 +3071,14 @@ head(tp53_res$exons,5)
 #>   seqinfo: 1 sequence from an unspecified genome; no seqlengths
 ```
 
-While `scored_grnas` contains the complete set of (unpaired) gRNAs,
-their genomic coordinates, and the on-target score. The
-`sequence_context` column is the protospacer + PAM as well as the
-flanking nucleotides required for scoring (according to
-`crisprScore::scoringMethodsInfo`) based on the selected scoring method.
+`scored_grnas` contains the complete set of (unpaired) gRNAs, their
+genomic coordinates, and the on-target score. When off-target scoring is
+enabled, each gRNA also carries `specificity_score` (MIT-style, 0-100),
+`n_offtargets` (hit count with CFD \>0.01), and `has_exonic_offtarget`
+(whether any exonic off-target has CFD \>0.1). The `sequence_context`
+column is the protospacer + PAM as well as the flanking nucleotides
+required for scoring (according to `crisprScore::scoringMethodsInfo`)
+based on the selected scoring method.
 
 ``` r
 head(tp53_res$scored_grnas,5)
@@ -2770,16 +3159,398 @@ In order to significantly speed up the primer design process, I have
 applied vectorisation to batch-pass the designed primers between R and
 the Python backend.
 
+### Off-target scoring
+
+A gRNA that efficiently cuts its intended target is only useful if it
+doesn’t also cut elsewhere in the genome. This is especially important
+for `mutateR`’s dual-gRNA deletion strategy: Each experiment involves
+*two* guides acting simultaneously, so the total off-target risk is the
+combined burden of both. A pair of individually “okay” guides can be
+collectively risky.
+
+`mutateR` attempts to address this by performing a genome-wide
+off-target search, scoring each hit using the CFD (Cutting Frequency
+Determination) method ([Hsu et al., *Nature Biotechnology*
+(2013)](https://doi.org/10.1038/nbt.2647)), and aggregating the results
+into a per-gRNA MIT-style specificity score (0-100). These individual
+scores are then combined into a pair-level specificity score that
+reflects the additive off-target burden of both guides. Only pairs above
+the `min_pair_specificity` threshold (default 10) are recommended in the
+pipeline output.
+
+Off-target scoring is **enabled by default** in `run_mutateR()` and can
+be disabled with `offtarget = FALSE` for fast prototyping runs (or if
+you don’t care about off-target activity for whatever reason).
+
+#### Backends
+
+`mutateR` provides three off-target search backends. In most cases, the
+default Bowtie backend is all you need.
+
+| Backend | Speed | Sensitivity | Dependencies | Recommended for |
+|----|----|----|----|----|
+| `bowtie` (default) | \<1 min for ~400 guides at 3 mismatches | Mismatch-only (up to 3mm) | `crisprBowtie`, `Rbowtie`, `crisprBase` (Bioconductor) | Most users; standard desktop analysis |
+| `hybrid` | \<1 min Phase 1 + variable Phase 2 | Mismatch (all guides) + bulge refinement (recommended pairs only) | Above + CRISPRitz CLI (conda/WSL) | Users wanting bulge sensitivity on final selections |
+| `crispritz` | ~15s per guide (indexed, bMax=1) | Mismatch + DNA/RNA bulges (all guides) | CRISPRitz CLI (conda/WSL) | HPC / advanced users; comprehensive analysis |
+
+**Bowtie** performs fast mismatch-only alignment via `crisprBowtie` /
+`Rbowtie`. It supports up to 3 mismatches (Bowtie’s hard limit) and
+searches only canonical PAMs by default (matching the MIT specificity
+calibration). This is the workhorse backend and handles the vast
+majority of use cases with negligible runtime (once the genome index has
+been prebuilt, see [Cache and genome index
+management](#cache-and-genome-index-management)).
+
+**Hybrid** mode runs Bowtie Phase 1 on all guides (fast), then
+selectively refines only the guides present in recommended pairs using
+CRISPRitz with bulge detection (Phase 2). This gives you bulge detection
+on the guides you’ll practically select without paying the CRISPRitz
+cost for every guide. If CRISPRitz is not available, hybrid mode falls
+back gracefully to Bowtie-only scores.
+
+**CRISPRitz** is a (currently experimental) reimplementation (including
+for Windows users via WSL) of the off-target scoring facet of the
+Pinello lab’s [CRISPRitz](https://github.com/pinellolab/CRISPRitz) tool
+([Cancellieri et al., *Bioinformatics*
+(2020)](https://pubmed.ncbi.nlm.nih.gov/31764961/)). This mode runs a
+single-pass indexed search on all guides, capturing both mismatch and
+bulge off-targets. It is significantly slower and more memory-intensive
+than Bowtie on Windows systems (via WSL), but provides the most
+comprehensive off-target landscape. See
+<a href="#0" style="font-size: 11pt;">CRISPRitz backend
+(experimental)</a> for important notes and usage caveats.
+
+#### Usage
+
+``` r
+library(BSgenome.Hsapiens.UCSC.hg38)
+
+# Default: Bowtie mismatch-only (recommended for most users)
+result <- run_mutateR(
+  gene_id = "TP53",
+  species = "hsapiens",
+  genome = BSgenome.Hsapiens.UCSC.hg38,
+  nuclease = "Cas9"
+  # ot_backend = "bowtie" is the default
+)
+
+# Hybrid: Bowtie + CRISPRitz bulge refinement on recommended pairs
+result <- run_mutateR(
+  gene_id = "TP53",
+  species = "hsapiens",
+  genome = BSgenome.Hsapiens.UCSC.hg38,
+  nuclease = "Cas9",
+  ot_backend = "hybrid"
+)
+
+# Skip off-target scoring (fast prototyping)
+result <- run_mutateR(
+  gene_id = "TP53",
+  species = "hsapiens",
+  genome = BSgenome.Hsapiens.UCSC.hg38,
+  nuclease = "Cas9",
+  offtarget = FALSE
+)
+```
+
+Key parameters for off-target scoring in `run_mutateR()`:
+
+| Parameter | Default | Description |
+|----|----|----|
+| `offtarget` | `TRUE` | Master switch for off-target analysis. |
+| `ot_backend` | `"bowtie"` | Search backend (`"bowtie"`, `"hybrid"`, or `"crispritz"`). |
+| `max_mismatches` | `3` | Maximum mismatches (clamped to 3 for Bowtie). |
+| `min_pair_specificity` | `10` | Minimum pair specificity for recommended status. |
+| `ot_detail_level` | `"compact"` | How much hit detail to retain (`"compact"`, `"full"`, `"file"`, `"none"`). |
+| `max_dna_bulges` | `2` | Maximum DNA bulge size (CRISPRitz/hybrid only). |
+| `max_rna_bulges` | `2` | Maximum RNA bulge size (CRISPRitz/hybrid only). |
+| `ot_canonical_only` | `TRUE` | Search canonical PAMs only (Bowtie/hybrid). |
+
+See `?score_offtargets` for the full parameter documentation.
+
+#### Understanding pair specificity
+
+For a single gRNA, the MIT specificity score summarises genome-wide
+off-target risk as:
+
+$$
+\text{Specificity} = \frac{100}{1 + \sum_i \text{CFD}_i}
+$$
+
+where the sum is over all off-target hits (excluding the on-target
+site). A score of 100 means zero off-target burden; lower values mean
+more predicted off-target activity.
+
+For a two-guide experiment, off-target damage from each gRNA is assumed
+to be independent and additive (please contact me if you have evidence
+to the contrary!). `mutateR` computes a pair specificity that reflects
+this combined burden in the following manner:
+
+1.  **Per-guide off-target burden.** Rearranging the specificity formula
+    gives the off-target burden $S$ — the total CFD-weighted off-target
+    activity relative to the on-target cut:
+
+$$
+S = \frac{100}{\text{Specificity}} - 1
+$$
+
+A guide with specificity 100 has $S = 0$ (no off-target burden); a guide
+with specificity 50 has $S = 1$ (off-target activity equal to on-target
+activity).
+
+2.  **Pair burden.** Since each guide cuts independently, the total
+    off-target burden is additive:
+
+$$
+S_{\text{pair}} = S_{5p} + S_{3p}
+$$
+
+3.  **Pair specificity.** Substituting the pair burden back into the
+    specificity formula:
+
+$$
+\text{Specificity}_{\text{pair}} = \frac{100}{1 + S_{\text{pair}}} = \frac{100}{1 + \left(\frac{100}{\text{Spec}_{5p}} - 1\right) + \left(\frac{100}{\text{Spec}_{3p}} - 1\right)} = \frac{100}{\frac{100}{\text{Spec}_{5p}} + \frac{100}{\text{Spec}_{3p}} - 1}
+$$
+
+This has two useful properties:
+
+- It is **more stringent than the minimum** for balanced pairs. Two
+  guides each with specificity 50 yield a pair specificity of 33.3 (not
+  50), correctly reflecting the doubled off-target burden.
+
+- It is **more lenient than the minimum** for asymmetric pairs. A weak
+  guide (specificity 45) paired with a strong guide (specificity 90)
+  yields 42.9, correctly crediting the strong partner’s minimal
+  contribution to total risk burden.
+
+| Guide A | Guide B | Pair specificity | Interpretation                        |
+|---------|---------|------------------|---------------------------------------|
+| 90      | 90      | 81.8             | Two highly specific guides            |
+| 50      | 50      | 33.3             | Each guide doubles the total burden   |
+| 45      | 90      | 42.9             | Strong partner partially compensates  |
+| 30      | 30      | 17.6             | Both mediocre — combined risk is high |
+
+The formula also implies an absolute individual specificity floor.
+Consider the best possible case: one guide is perfect
+($\text{Specificity} = 100$, $S = 0$). The pair specificity then reduces
+to:
+
+$$
+\text{Specificity}_{\text{pair}} = \frac{100}{1 + S_{\text{other}} + 0} = \frac{100}{\frac{100}{\text{Spec}_{\text{other}}}} = \text{Spec}_{\text{other}}
+$$
+
+That is, even with a perfect partner, the pair specificity cannot exceed
+the weaker guide’s individual specificity. A `min_pair_specificity`
+threshold of $T$ therefore requires *every* guide in the pair to have
+individual specificity $\geq T$, regardless of partner guide quality.
+
+As a consequence of this, the default threshold
+(`min_pair_specificity = 10`) is deliberately permissive; it flags only
+the most problematic pairs (otherwise my empirical observation is that
+you almost never get any accepted guide pairs). You can increase this
+for more stringent filtering if you wish.
+
+#### Cache and genome index management
+
+The first time you run off-target scoring for a given genome, `mutateR`
+performs two one-time setup steps:
+
+1.  **Genome FASTA export:** Extracts standard chromosomes from your
+    BSgenome object to per-chromosome FASTA files (this is a requirement
+    for CRISPRitz, 2.91 Gb for hg38).
+2.  **Bowtie index build:** Constructs a Bowtie index from these FASTA
+    files (~10-15 minutes and 2.93 Gb for hg38).
+
+Both are cached persistently in `tools::R_user_dir("mutateR", "cache")`
+and reused across R sessions. Subsequent off-target runs start searching
+immediately.
+
+Approximate disk usage for hg38 (haven’t yet checked expense for other
+genomes):
+
+| Component | Size | When created |
+|----|----|----|
+| Genome FASTA cache | 2.91 GB | First off-target run (any backend) |
+| Bowtie index | 2.93 GB | First Bowtie/hybrid run |
+| CRISPRitz TST index (bMax=1) | ~6.5 GB (varies depending on `bMax`) | First CRISPRitz/hybrid run |
+
+#### Interpreting off-target output
+
+When off-target scoring is enabled, the `run_mutateR()` output includes:
+
+**In `$pairs`:** Per-pair specificity columns (`specificity_score_5p`,
+`specificity_score_3p`, `pair_specificity`, `n_offtargets_5p`,
+`n_offtargets_3p`) and updated `recommended` flags incorporating the
+pair specificity threshold.
+
+**In `$scored_grnas`:** Per-gRNA columns (`specificity_score`,
+`n_offtargets`, `has_exonic_offtarget`) attached to the GRanges
+metadata.
+
+**As attributes:** Off-target hit details (filtered per
+`ot_detail_level`) are available via
+`attr(result$scored_grnas, "offtarget_details")`. When
+`ot_detail_level = "file"`, the full unfiltered details are written to a
+compressed RDS file whose path is stored in
+`result$offtarget_details_path`.
+
+**At the top level:** `result$ot_backend` records which backend was
+used; `result$ot_detail_level` records the detail level setting.
+
+#### CRISPRitz backend (experimental)
+
+> **Important:** The CRISPRitz backend is a highly experimental feature
+> and is **strongly NOT recommended for local/desktop production use.**
+> It works, and I’ve invested significant effort in adapting it for use
+> in WSL, but it remains fundamentally memory-intensive and slow
+> relative to Bowtie. It is included in `mutateR` for users with access
+> to HPC environments (though I haven’t yet tested it on an HPC cluster)
+> or specific research needs requiring bulge-aware off-target detection.
+> For the vast majority of use cases, the default Bowtie backend (and
+> the hybrid approach) is sufficient and vastly more practical.
+
+##### What it adds
+
+The Bowtie backend detects only mismatch-based off-targets (*i.e.*,
+sites where the gRNA aligns to the genome with nucleotide
+substitutions). CRISPRitz ([Cancellieri et al., *Bioinformatics*
+(2020)](https://doi.org/10.1093/bioinformatics/btz867)) additionally
+detects **DNA and RNA bulge** off-targets, where insertions or deletions
+in the alignment create single-nucleotide bulges. Some biologically
+validated off-target sites involve bulges rather than (or in addition
+to) mismatches, so bulge-aware searching provides a more complete
+off-target landscape.
+
+##### Why it’s experimental
+
+- **Speed:** Based on my local testing, CRISPRitz indexed search runs at
+  approximately 15 seconds per guide (bMax=1, 3-4 threads, hg38). For a
+  gene like *TP53* with ~400 guides, a full CRISPRitz run (without
+  problematic guides, see below) takes \>100 minutes.
+
+- **Memory:** Each CRISPRitz thread loads a full copy of the TST
+  (Ternary Search Tree) index into memory (~1.5-2 GB per thread for hg38
+  at bMax=1). With 3-4 threads, CRISPRitz alone requires 5-8 GB of RAM
+  before accounting for R’s own memory footprint.
+
+- **Repeat-rich guides:** Guides derived from repetitive elements (Alu
+  SINEs, LINE-SINE junctions, etc.) match tens of millions of genomic
+  loci. CRISPRitz accumulates all hits in memory without bounds, which
+  can exhaust physical RAM and trigger OOM kills. I’ve attempted to
+  account for this in `mutateR` by including pre-screening (linguistic
+  complexity analysis) and reactive quarantine logic (single-guide
+  probing with automatic isolation of toxic guides), but edge cases may
+  still cause crashes in memory-constrained environments. This remains
+  an active area of development (when I can get around to it).
+
+- **bMax=2 is effectively unusable locally in batch mode:** At bMax=2,
+  CRISPRitz search time increases ~22-fold per guide (~18 min/guide),
+  and multi-guide batches reliably cause OOM crashes. I’ve configured
+  `mutateR` so that it caps bulge depth at bMax=1 for batched search
+  unless `full_bulge_scan = TRUE` is explicitly set, and even then
+  triggers sequential single-guide fallback. I intend to stress-test
+  this on an HPC system with as many threads as I can throw at it, but
+  the bMax=1 cap is deliberate and *should not* be changed for now (or
+  do so at your own risk).
+
+##### Windows users: CRISPRitz via WSL
+
+`mutateR` is - to my knowledge, and apologies to the Pinello lab if
+not - unique in supporting CRISPRitz execution on Windows via the
+Windows Subsystem for Linux (WSL) (Note: The full CRISPRitz tool can be
+run on Windows via Docker - see
+<https://github.com/pinellolab/CRISPRitz> - but I am only attempting to
+adapt its off-target scoring elements in `mutateR` rather than the
+entire tool).
+
+The package automatically handles Windows\<-\>WSL path translation,
+one-time index copying to the WSL-native filesystem (for dramatically
+faster I/O), and inter-batch memory reclamation.
+
+To set up CRISPRitz for Windows:
+
+1.  Ensure [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install)
+    is installed with a Linux distribution (*e.g.* Ubuntu).
+
+2.  Open a WSL terminal and create a conda environment:
+
+    ``` bash
+    conda create -n r-mutater-wsl python=3.9
+    conda install -n r-mutater-wsl -c bioconda -c conda-forge crispritz
+    ```
+
+3.  `mutateR` detects the WSL environment automatically.
+
+> **WSL memory:** WSL2 runs inside a Hyper-V VM with a default memory
+> ceiling (typically 50% of host RAM). For CRISPRitz, we recommend
+> configuring at least 16 GB via `%UserProfile%\.wslconfig`:
+>
+>     [wsl2]
+>     memory=16GB
+
+##### Recommendation
+
+For desktop/laptop analysis, use the **Bowtie** backend (default) or
+**hybrid** mode (which only invokes CRISPRitz on the small subset of
+recommended-pair guides). Reserve the standalone **CRISPRitz** backend
+for HPC environments with high RAM availability, or for targeted
+single-gene analyses where you specifically need bulge-aware off-target
+detection.
+
+A note on the hybrid approach: This applies filtering on already
+filtered guides - my empirical observation across multiple genes is that
+Phase 2 bulge detection tends to leave you with 0 recommended guides.
+Hence, Bowtie remains the default and the recommended approach.
+
+#### Scoring methodology
+
+For transparency, the following is how `mutateR` scores and aggregates
+off-target hits:
+
+- **CFD scoring (Cas9 mismatch hits):** Each off-target alignment is
+  scored using the Cutting Frequency Determination position-weight
+  matrix from [Hsu et al. (2013)](https://doi.org/10.1038/nbt.2647),
+  accessed via `crisprScore::getCFDScores()`. The CFD score (0-1)
+  reflects the predicted cutting activity at that off-target site
+  relative to a perfect match.
+
+- **Bulge hits:** For alignments containing DNA or RNA bulges, the CFD
+  score is computed on the aligned (length-matched) portion of the
+  sequences, then multiplied by a bulge penalty:
+  $\text{CFD} \times \text{bulge penalty}^\text{bulge size}$ (default
+  `bulge_penalty = 0.2`). This assumes each nucleotide of bulge
+  substantially reduces cutting efficiency.
+
+- **Non-Cas9 nucleases:** The Hsu CFD matrix is Cas9-specific. For
+  Cas12a and enCas12a, `mutateR` uses a simple mismatch-count heuristic
+  ($0.5^{\text{n\_mismatches}}$) as a placeholder. Dedicated Cas12a
+  off-target scoring matrices may be integrated in future (assuming
+  someone is working on this problem - it’s kind of beyond my remit). I
+  am aware of <https://pmc.ncbi.nlm.nih.gov/articles/PMC10581463/> and
+  will check it and other literature for suitability when I can.
+
+- **MIT specificity aggregation:** Per-gRNA specificity is computed as
+  $\frac{100}{(1 + \Sigma{CFD})}$ across all off-target hits, where the
+  on-target site (identified by a ±10 bp positional window) is excluded.
+
+- **On-target exclusion:** Hits within 10 bp of the gRNA’s own cut site
+  on the same chromosome are classified as on-target and excluded from
+  the off-target CFD sum.
+
+- **Exonic annotation:** Off-target hits are intersected with the input
+  exon coordinates. Guides with any exonic off-target hit having CFD \>
+  0.1 are flagged via `has_exonic_offtarget`.
+
 ### Special cases
 
 #### When the same exon is targeted twice
 
-In certain cases, both gRNAs in a pair will target the same exon (e.g.,
-if two phase-compatible exons are separated by a single exon, such that
-the intervening exon is to be removed). In these cases, specific rules
-need to be applied in order to prevent the generation of small deletions
-that would likely cause the retention of a frameshifted exon remnant in
-the mature mRNA, and a consequent PTC.
+In certain cases, both gRNAs in a pair will target the same exon
+(*e.g.*, if two phase-compatible exons are separated by a single exon,
+such that the intervening exon is to be removed). In these cases,
+specific rules need to be applied in order to prevent the generation of
+small deletions that would likely cause the retention of a frameshifted
+exon remnant in the mature mRNA, and a consequent PTC.
 
 To account for these, I have applied the following filters during gRNA
 pair assembly for pairs where both gRNAs target the same exon:
@@ -2811,7 +3582,7 @@ pair assembly for pairs where both gRNAs target the same exon:
 Given that NMD induction requires persistence of EJCs, genes with one or
 two exons tend to not be quite as prone to this mode of transcriptional
 adaptive response. However, we still want these types of genes to be
-able to be processed by `mutateR`, which will automatically recognise
+able to be handled by `mutateR`, which will automatically recognise
 these edge cases if you provide such a gene (or a specific transcript
 with only 1-2 exons).
 
@@ -2830,20 +3601,21 @@ opn4.1 <- run_mutateR(gene_id = 'opn4.1',
                      species = 'drerio',
                      genome = BSgenome.Drerio.UCSC.danRer11,
                      nuclease = 'Cas9',
-                     score_method = 'ruleset1')
+                     score_method = 'ruleset1',
+                     offtarget = FALSE)
 #> Retrieving gene/transcript information...
 #> Using transcript: ENSDART00000018501 for gene: opn4.1
-#> Locating Cas9 target sites...
+#> Locating Cas9 target sites (PAM: NGG)...
 #> PAM distribution:
 #> 
 #> AGG CGG GGG TGG 
 #>  72  45  68 102
 #> Scoring gRNAs using model: ruleset1
-#> Computing on‑target scores using ruleset1 model...
+#> Computing on-target scores using ruleset1 model...
 #> Scored 287 guides using ruleset1.
 #> Assembling valid gRNA pairs for opn4.1 ...
 #> Assembling gRNA pairs for exon‑flanking deletions...
-#> Detected probability-based scores (e.g. ruleset1). Using default cutoff: 0.5
+#> Detected probability-like scores (ruleset1). Using default cutoff: 0.5
 #> Single-exon/two-exon gene detected: constructing intragenic deletion pairs.
 #> Detected intragenic assembly mode (≤2 exons).
 #> Designing genotyping primers for 465 recommended pairs...
@@ -2854,7 +3626,7 @@ opn4.1 <- run_mutateR(gene_id = 'opn4.1',
 #> Designed primers for 465/465 pairs.
 #> Plotting exon phase compatibility and gRNA pairs...
 #> Error in combn(exon_ranks, 2) : n < m
-#> mutateR pipeline completed for opn4.1, finding 465 gRNA pairs.
+#> mutateR pipeline completed for opn4.1 (Cas9/ruleset1, off-target: skipped), finding 465 gRNA pairs.
 ```
 
 ``` r
@@ -2923,6 +3695,31 @@ genomic_deletion_size
 <th style="text-align:left;">
 
 transcript_id
+</th>
+
+<th style="text-align:right;">
+
+specificity_score_5p
+</th>
+
+<th style="text-align:right;">
+
+specificity_score_3p
+</th>
+
+<th style="text-align:right;">
+
+n_offtargets_5p
+</th>
+
+<th style="text-align:right;">
+
+n_offtargets_3p
+</th>
+
+<th style="text-align:right;">
+
+pair_specificity
 </th>
 
 <th style="text-align:left;">
@@ -3033,6 +3830,31 @@ chr2
 ENSDART00000018501
 </td>
 
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
 <td style="text-align:left;">
 
 TRUE
@@ -3135,6 +3957,31 @@ chr2
 <td style="text-align:left;">
 
 ENSDART00000018501
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
 </td>
 
 <td style="text-align:left;">
@@ -3241,6 +4088,31 @@ chr2
 ENSDART00000018501
 </td>
 
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
 <td style="text-align:left;">
 
 TRUE
@@ -3343,6 +4215,31 @@ chr2
 <td style="text-align:left;">
 
 ENSDART00000018501
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
 </td>
 
 <td style="text-align:left;">
@@ -3449,6 +4346,31 @@ chr2
 ENSDART00000018501
 </td>
 
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
+<td style="text-align:right;">
+
+NA
+</td>
+
 <td style="text-align:left;">
 
 TRUE
@@ -3510,8 +4432,8 @@ useful information yet.
 
 If a PTC occurs in the terminal exon of a gene, the PTC-bearing
 transcript is unlikely to induce NMD and subsequent compensation (an
-example of such an allele is the *sgsh<sup>Δex5−6</sup>* zebrafish
-mutant in [Douek et al., IJMS
+example of such an allele from yours truly is the
+*sgsh<sup>Δex5−6</sup>* zebrafish mutant in [Douek et al., IJMS
 (2021)](https://www.mdpi.com/1422-0067/22/11/5948 "An Engineered sgsh Mutant Zebrafish Recapitulates Molecular and Behavioural Pathobiology of Sanfilippo Syndrome A/MPS IIIA")).
 `mutateR` factors in predicted terminal exon PTCs when scanning for
 tolerated deletions, and flags these cases in the `run_mutateR` output
@@ -3540,7 +4462,7 @@ app is included in the exported CSV.
 
 ## Manual function execution
 
-You may wish to call lower-level functions directly (e.g., for use in
+You may wish to call lower-level functions directly (*e.g.*, for use in
 other programmatic pipelines). Note, however, that many of these
 functions are built to take outputs from other `mutateR` functions.
 Refer to the manual pages for specific input requirements for each
@@ -3549,20 +4471,20 @@ function.
 ## To be implemented
 
 - More nucleases (maybe from CasPEDIA or similar?)
-
-- All `crisprScore` scoring methods – Work in progress
-
-- Integration of off-target prediction analysis
-
+- All `crisprScore` scoring methods - Work in progress
+- Constitutive exon filtering (to prioritise exons present in all
+  protein-coding isoforms)
+- Vendor-ready export - format gRNA lists for oligo synthesis vendors
+  (*e.g.* IDT, pending checking with them that this is fine)
 - Cross-species sequence/domain conservation scoring/visualisation
-
+  (PhastCons integration)
 - Workflow for handling of intronic target sequences
 
 ## Session information
 
 ``` r
 sessionInfo()
-#> R version 4.5.1 (2025-06-13 ucrt)
+#> R version 4.5.2 (2025-10-31 ucrt)
 #> Platform: x86_64-w64-mingw32/x64
 #> Running under: Windows 11 x64 (build 26100)
 #> 
@@ -3583,64 +4505,64 @@ sessionInfo()
 #> 
 #> other attached packages:
 #>  [1] BSgenome.Drerio.UCSC.danRer11_1.4.2 RColorBrewer_1.1-3                 
-#>  [3] tibble_3.3.0                        ggplot2_4.0.1                      
-#>  [5] purrr_1.2.0                         dplyr_1.1.4                        
-#>  [7] BSgenome.Hsapiens.UCSC.hg38_1.4.5   BSgenome_1.77.2                    
-#>  [9] rtracklayer_1.69.1                  BiocIO_1.19.0                      
-#> [11] Biostrings_2.77.2                   XVector_0.49.1                     
-#> [13] GenomicRanges_1.61.5                GenomeInfoDb_1.45.12               
-#> [15] Seqinfo_0.99.2                      IRanges_2.43.2                     
-#> [17] S4Vectors_0.47.2                    BiocGenerics_0.55.1                
-#> [19] generics_0.1.4                      mutateR_0.0.1                      
-#> [21] reticulate_1.44.1                  
+#>  [3] tibble_3.3.1                        ggplot2_4.0.2                      
+#>  [5] purrr_1.2.2                         dplyr_1.2.1                        
+#>  [7] BSgenome.Hsapiens.UCSC.hg38_1.4.5   BSgenome_1.78.0                    
+#>  [9] rtracklayer_1.70.1                  BiocIO_1.20.0                      
+#> [11] Biostrings_2.78.0                   XVector_0.50.0                     
+#> [13] GenomicRanges_1.62.1                GenomeInfoDb_1.46.2                
+#> [15] Seqinfo_1.0.0                       IRanges_2.44.0                     
+#> [17] S4Vectors_0.49.1-1                  BiocGenerics_0.56.0                
+#> [19] generics_0.1.4                      mutateR_0.1.1                      
+#> [21] reticulate_1.46.0                  
 #> 
 #> loaded via a namespace (and not attached):
-#>  [1] DBI_1.2.3                   bitops_1.0-9               
-#>  [3] httr2_1.2.1                 biomaRt_2.65.16            
-#>  [5] rlang_1.1.6                 magrittr_2.0.4             
-#>  [7] matrixStats_1.5.0           compiler_4.5.1             
-#>  [9] RSQLite_2.4.5               dir.expiry_1.17.0          
-#> [11] png_0.1-8                   systemfonts_1.3.1          
-#> [13] vctrs_0.6.5                 stringr_1.6.0              
-#> [15] pkgconfig_2.0.3             crayon_1.5.3               
-#> [17] fastmap_1.2.0               dbplyr_2.5.1               
-#> [19] labeling_0.4.3              Rsamtools_2.25.3           
-#> [21] rmarkdown_2.30              UCSC.utils_1.5.0           
-#> [23] bit_4.6.0                   xfun_0.54                  
-#> [25] randomForest_4.7-1.2        cachem_1.1.0               
-#> [27] jsonlite_2.0.0              progress_1.2.3             
-#> [29] blob_1.2.4                  DelayedArray_0.35.3        
-#> [31] BiocParallel_1.43.4         parallel_4.5.1             
-#> [33] prettyunits_1.2.0           R6_2.6.1                   
-#> [35] stringi_1.8.7               Rcpp_1.1.0                 
-#> [37] SummarizedExperiment_1.39.2 knitr_1.50                 
-#> [39] Matrix_1.7-4                tidyselect_1.2.1           
-#> [41] rstudioapi_0.17.1           dichromat_2.0-0.1          
-#> [43] abind_1.4-8                 yaml_2.3.11                
-#> [45] codetools_0.2-20            curl_7.0.0                 
-#> [47] lattice_0.22-7              Biobase_2.69.1             
-#> [49] withr_3.0.2                 KEGGREST_1.49.1            
-#> [51] S7_0.2.1                    evaluate_1.0.5             
-#> [53] crisprScoreData_1.13.0      BiocFileCache_2.99.6       
-#> [55] xml2_1.5.0                  ExperimentHub_2.99.5       
-#> [57] pillar_1.11.1               BiocManager_1.30.27        
-#> [59] filelock_1.0.3              MatrixGenerics_1.21.0      
-#> [61] crisprScore_1.13.1          RCurl_1.98-1.17            
-#> [63] BiocVersion_3.22.0          hms_1.1.4                  
-#> [65] scales_1.4.0                glue_1.8.0                 
-#> [67] tools_4.5.1                 AnnotationHub_3.99.6       
-#> [69] GenomicAlignments_1.45.4    XML_3.99-0.20              
-#> [71] grid_4.5.1                  AnnotationDbi_1.71.1       
-#> [73] basilisk_1.21.5             restfulr_0.0.16            
-#> [75] cli_3.6.5                   rappdirs_0.3.3             
-#> [77] textshaping_1.0.4           kableExtra_1.4.0           
-#> [79] viridisLite_0.4.2           S4Arrays_1.9.1             
-#> [81] svglite_2.2.2               gtable_0.3.6               
-#> [83] digest_0.6.39               SparseArray_1.9.1          
-#> [85] rjson_0.2.23                farver_2.1.2               
-#> [87] memoise_2.0.1               htmltools_0.5.9            
-#> [89] lifecycle_1.0.4             httr_1.4.7                 
-#> [91] bit64_4.6.0-1
+#>  [1] DBI_1.3.0                   bitops_1.0-9               
+#>  [3] httr2_1.2.2                 biomaRt_2.66.1             
+#>  [5] rlang_1.2.0                 magrittr_2.0.5             
+#>  [7] otel_0.2.0                  matrixStats_1.5.0          
+#>  [9] compiler_4.5.2              RSQLite_2.4.6              
+#> [11] dir.expiry_1.18.0           png_0.1-9                  
+#> [13] systemfonts_1.3.2           vctrs_0.7.3                
+#> [15] stringr_1.6.0               pkgconfig_2.0.3            
+#> [17] crayon_1.5.3                fastmap_1.2.0              
+#> [19] dbplyr_2.5.2                labeling_0.4.3             
+#> [21] Rsamtools_2.26.0            rmarkdown_2.31             
+#> [23] UCSC.utils_1.6.1            bit_4.6.0                  
+#> [25] xfun_0.57                   randomForest_4.7-1.2       
+#> [27] cachem_1.1.0                cigarillo_1.0.0            
+#> [29] jsonlite_2.0.0              progress_1.2.3             
+#> [31] blob_1.3.0                  DelayedArray_0.36.0        
+#> [33] BiocParallel_1.44.0         parallel_4.5.2             
+#> [35] prettyunits_1.2.0           R6_2.6.1                   
+#> [37] stringi_1.8.7               Rcpp_1.1.1-1               
+#> [39] SummarizedExperiment_1.40.0 knitr_1.51                 
+#> [41] Matrix_1.7-5                tidyselect_1.2.1           
+#> [43] rstudioapi_0.18.0           abind_1.4-8                
+#> [45] yaml_2.3.12                 codetools_0.2-20           
+#> [47] curl_7.0.0                  lattice_0.22-9             
+#> [49] Biobase_2.70.0              withr_3.0.2                
+#> [51] KEGGREST_1.50.0             S7_0.2.1-1                 
+#> [53] evaluate_1.0.5              crisprScoreData_1.14.0     
+#> [55] BiocFileCache_3.0.0         xml2_1.5.2                 
+#> [57] ExperimentHub_3.0.0         pillar_1.11.1              
+#> [59] BiocManager_1.30.27         filelock_1.0.3             
+#> [61] MatrixGenerics_1.22.0       crisprScore_1.14.0         
+#> [63] RCurl_1.98-1.18             BiocVersion_3.22.0         
+#> [65] hms_1.1.4                   scales_1.4.0               
+#> [67] glue_1.8.1                  tools_4.5.2                
+#> [69] AnnotationHub_4.0.0         GenomicAlignments_1.46.0   
+#> [71] XML_3.99-0.23               grid_4.5.2                 
+#> [73] AnnotationDbi_1.72.0        basilisk_1.22.0            
+#> [75] restfulr_0.0.16             cli_3.6.6                  
+#> [77] rappdirs_0.3.4              textshaping_1.0.5          
+#> [79] kableExtra_1.4.0            viridisLite_0.4.3          
+#> [81] S4Arrays_1.10.1             svglite_2.2.2              
+#> [83] gtable_0.3.6                digest_0.6.39              
+#> [85] SparseArray_1.10.9          rjson_0.2.23               
+#> [87] farver_2.1.2                memoise_2.0.1              
+#> [89] htmltools_0.5.9             lifecycle_1.0.5            
+#> [91] httr_1.4.8                  bit64_4.6.0-1
 ```
 
 ## References
@@ -3687,3 +4609,12 @@ Douek, A. M. *et al.* An Engineered sgsh Mutant Zebrafish Recapitulates
 Molecular and Behavioural Pathobiology of Sanfilippo Syndrome A/MPS
 IIIA. *Int J Mol Sci* **22**, 5948 (2021).
 <https://doi.org/10.3390/ijms22115948>
+
+Hsu, P. D., *et al.* “DNA targeting specificity of RNA-guided Cas9
+nucleases.” *Nat Biotechnol* **31(9)**, 827-832 (2013).
+<https://doi.org/10.1038/nbt.2647>
+
+Cancellieri, S. *et al.* “CRISPRitz: rapid, high-throughput and
+variant-aware in silico off-target site identification for CRISPR genome
+editing.” Bioinformatics **36(7)**, 2001-2008 (2020).
+<https://doi.org/10.1093/bioinformatics/btz867>

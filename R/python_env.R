@@ -56,8 +56,34 @@ install_mutater_env <- function(envname = "r-mutater",
   message("Installing packages: ", paste(pkgs, collapse = ", "))
   reticulate::conda_install(envname, packages = pkgs, pip = TRUE)
 
-  message("\nInstallation complete! Please restart your R session before activating.")
-}
+  # Install CRISPRitz (bioconda - Linux/macOS only; Windows requires separate WSL)
+  if (.Platform$OS.type == "unix") {
+     message("Installing CRISPRitz for off-target analysis...")
+     conda_bin <- reticulate::conda_binary()
+     crispritz_exit <- system2(
+      conda_bin,
+      args = c("install", "-n", envname, "-y", "-c", "bioconda", "-c", "conda-forge", "crispritz"),
+      stdout = TRUE,
+      stderr = TRUE
+     )
+     if (!is.null(attr(crispritz_exit, "status")) && attr(crispritz_exit, "status") !=0 ) {
+      warning("CRISPRitz installation failed. Off-target scoring will not be available.\n",
+              "You can try installing manually: conda install -n ", envname,
+              " -c bioconda -c conda-forge crispritz\n",
+              "Output:\n", paste(crispritz_exit, collapse = "\n"))
+     } else {
+      message("CRISPRitz installed successfully.")
+     }
+  } else {
+    # For Windows OS, CRISPRitz must be installed inside WSL
+    message("Note: CRISPRitz is not available natively on Windows.")
+    message("Off-target scoring requires Windows Subsystem for Linux (WSL).")
+    message("To set up CRISPRitz in WSL, run in a WSL terminal:")
+    message("  conda create -n r-mutater-wsl python=3.9") # CRISPRitz's bioconda build only goes up to python 3.9 - check this periodically for changes
+    message("  conda install -n r-mutater-wsl -c bioconda -c conda-forge crispritz")
+    message("mutateR will automatically route off-target searches through WSL if available.")
+  }
+  }
 
 #' Activate the mutateR Python environment
 #'

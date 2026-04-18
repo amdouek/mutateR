@@ -14,6 +14,17 @@ run_mutateR(
   tracr = "Chen2013",
   deephf_var = c("wt_u6", "wt_t7", "wt", "esp", "hf"),
   min_score = NULL,
+  offtarget = TRUE,
+  ot_backend = c("bowtie", "hybrid", "crispritz"),
+  ot_threads = 4L,
+  ot_timeout = 600L,
+  max_mismatches = 3L,
+  max_dna_bulges = 2L,
+  max_rna_bulges = 2L,
+  ot_canonical_only = TRUE,
+  ot_detail_level = c("compact", "full", "file", "none"),
+  full_bulge_scan = FALSE,
+  min_pair_specificity = 10,
   design_primers = TRUE,
   primer_max_wt = 3000,
   primer_tm = 60,
@@ -51,6 +62,74 @@ If NULL (default), auto-selects based on scoring method:
 - RuleSet1/Azimuth/enPAM+GB/DeepHF: 0.5 (probability-like scale)
 - RuleSet3: 0.1 (z-score scale)}
 
+\item{offtarget}{Logical. Whether to run genome-wide off-target analysis
+(default TRUE). Set to FALSE for faster runs during prototyping.}
+
+\item{ot_backend}{Character. Off-target search backend:
+\describe{
+\item{"bowtie"}{(Default) Fast mismatch-only search via crisprBowtie.
+Requires a one-time Bowtie index build. No bulge detection.}
+\item{"hybrid"}{Bowtie mismatch search on all gRNAs (<1 min),
+followed by CRISPRitz bulge refinement on recommended-pair gRNAs
+only. Best balance of speed and sensitivity. Falls back gracefully
+to Bowtie-only if CRISPRitz is unavailable. NOTE: This is an experimental
+feature - while the hybrid scoring approach works, it generally leads to
+no recommended pairs being returned due to stringency of filtering.}
+\item{"crispritz"}{Single-pass indexed CRISPRitz (bMax=1) on all
+gRNAs. No Bowtie dependency. Includes mismatch + bulge
+off-targets. Slower than hybrid (~100 min for TP53-scale)
+but fully self-contained. Use \code{full_bulge_scan = TRUE}
+for exhaustive bMax>=2 analysis (very slow). NOTE: \emph{NOT RECOMMENDED} for
+local use. Still highly experimental, enormously memory-intensive, and not
+fully architected.}
+}
+Only used when \code{offtarget = TRUE}.}
+
+\item{ot_threads}{Integer. Number of threads for CRISPRitz off-target searching
+(default 4). Ignored by Bowtie backend.}
+
+\item{ot_timeout}{Integer. Maximum seconds for CRISPRitz execution (default 600).
+Ignored by Bowtie backend.}
+
+\item{max_mismatches}{Integer. Maximum mismatches for off-target search (default 3).
+Clamped to 3 for Bowtie backend. CRISPRitz supports up to 6.}
+
+\item{max_dna_bulges}{Integer. Maximum DNA bulge size (default 2).
+Used by CRISPRitz/hybrid backends only.}
+
+\item{max_rna_bulges}{Integer. Maximum RNA bulge size (default 2).
+Used by CRISPRitz/hybrid backends only.}
+
+\item{ot_canonical_only}{Logical (default TRUE). If TRUE, for Bowtie/hybrid backends
+search only canonical PAM off-targets. Matches CRISPRitz behaviour and MIT specificity
+calibration. Set to FALSE for analysis with non-canonical PAMs.}
+
+\item{ot_detail_level}{Character. Controls retention of off-target hit details
+(default \code{"compact"}). Passed to \code{\link{score_offtargets}}.
+\describe{
+\item{"compact"}{(Default) Retains significant hits only (CFD > 0.01,
+top 200 per gRNA). Good balance of information and memory.}
+\item{"full"}{Retains all hits. WARNING: may exceed 1 GB for large genomes.}
+\item{"file"}{Writes full details to compressed RDS in cache directory;
+attaches compact version in memory. Path available via
+\code{result$offtarget_details_path}.}
+\item{"none"}{Discards hit details. Smallest footprint; per-gRNA
+specificity scores are still computed.}
+}}
+
+\item{full_bulge_scan}{Logical (default FALSE). When TRUE and
+\code{ot_backend = "crispritz"}, passes the user's full bulge
+parameters (\code{max_dna_bulges}, \code{max_rna_bulges}) to
+CRISPRitz instead of capping at bMax=1. This is computationally
+expensive via WSL and unstable at bMax>=2 for multi-guide batches
+(sequential single-guide fallback will be triggered; ~18 min/guide).
+Ignored for \code{"bowtie"} and \code{"hybrid"} backends.}
+
+\item{min_pair_specificity}{Numeric. Minimum pair-level specificity score
+(0-100, default 10) for recommended status, using the additive off-target
+burden model. See \code{\link{assemble_grna_pairs}} for details. Only
+applied when \code{offtarget = TRUE}.}
+
 \item{design_primers}{Logical. Whether to design genotyping primers (default TRUE).}
 
 \item{primer_max_wt}{Integer. Max WT amplicon size before switching to dual-pair strategy (default 3000).}
@@ -75,6 +154,9 @@ A named list with elements:
 \item exons (GRanges)
 \item scored_grnas (GRanges)
 \item pairs (data.frame with gRNAs and primers)
+\item offtarget_details (data.frame, filtered per ot_detail_level; NULL if offtarget=FALSE)
+\item offtarget_details_path (character, filepath when ot_detail_level="file"; NULL otherwise)
+\item ot_detail_level (character, the detail level used)
 \item plot (ggplot or plotly object)
 }
 }
@@ -145,6 +227,50 @@ TP53_encas12a <- run_mutateR(
   species = "hsapiens",
   genome = BSgenome.Hsapiens.UCSC.hg38,
   nuclease = "enCas12a"
+)
+# --- Off-target backend examples ---
+
+# Default: fast Bowtie mismatch-only (recommended for most users)
+TP53_bowtie <- run_mutateR(
+  gene_id = "TP53",
+  species = "hsapiens",
+  genome = BSgenome.Hsapiens.UCSC.hg38,
+  nuclease = "Cas9",
+  ot_backend = "bowtie"       # default
+)
+
+# Hybrid: Bowtie for all guides, CRISPRitz bulge refinement for recommended pairs
+TP53_hybrid <- run_mutateR(
+  gene_id = "TP53",
+  species = "hsapiens",
+  genome = BSgenome.Hsapiens.UCSC.hg38,
+  nuclease = "Cas9",
+  ot_backend = "hybrid",
+  max_dna_bulges = 2L,
+  max_rna_bulges = 2L
+)
+
+# CRISPRitz only: comprehensive search with bulges on all guides (slow)
+TP53_crispritz <- run_mutateR(
+  gene_id = "TP53",
+  species = "hsapiens",
+  genome = BSgenome.Hsapiens.UCSC.hg38,
+  nuclease = "Cas9",
+  ot_backend = "crispritz",
+  max_mismatches = 4L,
+  max_dna_bulges = 2L,
+  max_rna_bulges = 2L,
+  ot_threads = 8L,
+  ot_timeout = 1200L
+)
+
+# Skip off-target scoring entirely (fast prototyping)
+TP53_fast <- run_mutateR(
+  gene_id = "TP53",
+  species = "hsapiens",
+  genome = BSgenome.Hsapiens.UCSC.hg38,
+  nuclease = "Cas9",
+  offtarget = FALSE
 )
 }
 

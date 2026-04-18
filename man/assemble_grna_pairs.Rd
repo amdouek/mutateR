@@ -9,7 +9,8 @@ assemble_grna_pairs(
   exon_gr,
   transcript_id,
   species,
-  score_cutoff = NULL
+  score_cutoff = NULL,
+  min_pair_specificity = 10
 )
 }
 \arguments{
@@ -22,6 +23,20 @@ assemble_grna_pairs(
 \item{species}{Character. Ensembl species short code.}
 
 \item{score_cutoff}{Numeric. Optional. If NULL, auto-selects based on \code{scoring_method} metadata.}
+
+\item{min_pair_specificity}{Numeric. Minimum pair-level specificity score
+(0-100, default 10) for a pair to receive the \code{recommended} flag.
+Computed via the additive off-target burden model: each guide's expected
+off-target burden \code{S = 100/specificity - 1} is summed, and pair
+specificity is \code{100 / (1 + S_5p + S_3p)}. This is more stringent
+than \code{pmin()} for balanced pairs (correctly reflecting doubled burden)
+and more lenient for asymmetric pairs (crediting a strong partner).
+A threshold of 10 accepts median-quality pairings while rejecting pairs
+where both guides are below-average. The formula implies an individual
+floor: no guide with specificity below ~\code{min_pair_specificity} can
+contribute to a passing pair regardless of partner quality.
+Ignored when off-target scoring was not performed (specificity columns
+are NA). See the package README for detailed derivation and calibration.}
 }
 \value{
 A \code{data.frame} of candidate exon‑flanking gRNA pairs.
@@ -34,4 +49,19 @@ Automatically detects scoring method to apply appropriate cutoffs:
 \item RuleSet1 / Azimuth / enPAM+GB: > 0.5 (probability-like scores)
 \item RuleSet3: > 0.1 (z-scores)
 }
+}
+\details{
+\strong{Pair specificity scoring.}
+Off-target risk in a two-guide experiment is additive: each gRNA independently
+creates DSBs at off-target loci, and a highly specific partner provides no
+protection against the other guide's off-target activity. The pair specificity
+is therefore derived from the summed off-target burden of both guides:
+
+\deqn{S_{pair} = S_{5'} + S_{3'} = \frac{100}{spec_{5'}} - 1 + \frac{100}{spec_{3'}} - 1}
+\deqn{pair\_specificity = \frac{100}{1 + S_{pair}} = \frac{100}{\frac{100}{spec_{5'}} + \frac{100}{spec_{3'}} - 1}}
+
+This formula is more stringent than \code{pmin()} for balanced pairs
+(two 50-scoring guides yield pair specificity 33.3, correctly reflecting
+doubled off-target burden) and more lenient for asymmetric pairs
+(a 45/90 pair scores 42.9 rather than being capped at 45).
 }

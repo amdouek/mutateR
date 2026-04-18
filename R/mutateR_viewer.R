@@ -96,10 +96,20 @@ mutateR_viewer <- function(plot_obj) {
 
         if (nrow(pairs_df) > 0) {
           sub_df <- pairs_df %>%
-            dplyr::filter(upstream_pair == e5, downstream_pair == e3) %>%
-            # Sort by recommended, then average score
-            dplyr::arrange(dplyr::desc(recommended),
-                           dplyr::desc((ontarget_score_5p + ontarget_score_3p)/2))
+            dplyr::filter(upstream_pair == e5, downstream_pair == e3)
+
+          # Sort by recommended, then pair specificity (if available), then on-target score
+          if ("pair_specificity" %in% names(sub_df)) {
+            sub_df <- sub_df %>%
+              dplyr::arrange(dplyr::desc(recommended),
+                             dplyr::desc(pair_specificity),
+                             dplyr::desc((ontarget_score_5p + ontarget_score_3p)/2))
+          } else {
+            sub_df <- sub_df %>%
+              dplyr::arrange(dplyr::desc(recommended),
+                             dplyr::desc((ontarget_score_5p + ontarget_score_3p)/2))
+          }
+
           heatmap_filtered_data(sub_df)
         } else {
           heatmap_filtered_data(data.frame())
@@ -110,9 +120,20 @@ mutateR_viewer <- function(plot_obj) {
           if(nrow(dat) > 0) {
             n_total <- nrow(dat)
             n_rec   <- sum(dat$recommended, na.rm = TRUE)
+
+            spec_line <- ""
+            if ("pair_specificity" %in% names(dat) && any(!is.na(dat$pair_specificity))) {
+              spec_range <- range(dat$pair_specificity, na.rm = TRUE)
+              spec_line <- paste0(
+                "<b>Pair specificity range:</b> ",
+                round(spec_range[1], 1), " \u2013 ", round(spec_range[2], 1), "<br/>"
+              )
+            }
+
             shiny::HTML(paste0(
               "<b>Exon Pair:</b> E", e5, " - E", e3, "<br/>",
-              "<b>Candidate Pairs:</b> ", n_total, " (", n_rec, " recommended)"
+              "<b>Candidate Pairs:</b> ", n_total, " (", n_rec, " recommended)<br/>",
+              spec_line
             ))
           } else {
             shiny::HTML(paste0(
@@ -136,6 +157,8 @@ mutateR_viewer <- function(plot_obj) {
         cols_to_show <- c("exon_5p", "exon_3p", "genomic_deletion_size",
                           "protospacer_sequence_5p", "ontarget_score_5p",
                           "protospacer_sequence_3p", "ontarget_score_3p",
+                          "specificity_score_5p", "specificity_score_3p",
+                          "pair_specificity",
                           "recommended") # For consideration: use the 'colvis' button option to allow users to select/deselect other columns from the $pairs dataframe
 
         # Add primer info if it exists
@@ -154,7 +177,10 @@ mutateR_viewer <- function(plot_obj) {
                         scrollX = TRUE,
                         select = list(style = 'multi')
                       )) %>%
-          DT::formatRound(columns = intersect(names(dat), c("ontarget_score_5p", "ontarget_score_3p")),
+          DT::formatRound(columns = intersect(names(dat),
+                                              c("ontarget_score_5p", "ontarget_score_3p",
+                                                "specificity_score_5p", "specificity_score_3p",
+                                                "pair_specificity")),
                           digits = 2)
       }, server = FALSE)
 

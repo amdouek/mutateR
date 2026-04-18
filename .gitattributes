@@ -1,0 +1,53 @@
+# ==============================================================================
+# mutateR .gitattributes
+# ==============================================================================
+
+# ---- Default: auto-detect and normalise line endings ----
+* text=auto
+
+# ---- R source files: always LF in repo, native on checkout ----
+*.R text eol=lf
+*.Rd text eol=lf
+*.Rmd text eol=lf
+*.Rnw text eol=lf
+
+# ---- Package metadata ----
+DESCRIPTION text eol=lf
+NAMESPACE text eol=lf
+LICENSE text eol=lf
+.Rbuildignore text eol=lf
+.Rinstignore text eol=lf
+
+# ---- Auxiliary scripts: strict LF (consumed by Unix tools / WSL) ----
+inst/awk/*.awk text eol=lf
+inst/python/*.py text eol=lf
+
+# ---- Data / documentation ----
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.csv text eol=lf
+*.tsv text eol=lf
+*.bib text eol=lf
+
+# ---- Binary files: never normalise ----
+*.rds binary
+*.RData binary
+*.rda binary
+*.png binary
+*.jpg binary
+*.gif binary
+*.pdf binary
+*.gz binary
+*.bz2 binary
+*.xz binary
+*.zip binary
+*.bin binary
+
+# ---- Linguist: repository language classification ----
+# Prevent auxiliary files from inflating non-R language stats
+inst/awk/*.awk linguist-detectable=false
+inst/python/*.py linguist-detectable=false
+man/*.Rd linguist-documentation
+vignettes/*.Rmd linguist-documentation
