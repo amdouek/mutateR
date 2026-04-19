@@ -62,7 +62,7 @@ It also produces a graphical representation of the selected transcript, its phas
 The `mutateR` pipeline consists of the following ordered main functions:
 
 | Step | Function | Functionality |
-|----|----|----|
+|------------------------|------------------------|------------------------|
 | 1 | `get_gene_info()` | Query Ensembl for gene and transcript metadata. |
 | 2 | `get_exon_structures()` | Retrieve exon coordinates and phase metadata. |
 | 3 | `find_cas9_sites()`/`find_cas12a_sites()` | Identify nuclease recognition sites. |
@@ -373,7 +373,7 @@ Off-target scoring is **enabled by default** in `run_mutateR()` and can be disab
 `mutateR` provides three off-target search backends. In most cases, the default Bowtie backend is all you need.
 
 | Backend | Speed | Sensitivity | Dependencies | Recommended for |
-|----|----|----|----|----|
+|---------------|---------------|---------------|---------------|---------------|
 | `bowtie` (default) | \<1 min for \~400 guides at 3 mismatches | Mismatch-only (up to 3mm) | `crisprBowtie`, `Rbowtie`, `crisprBase` (Bioconductor) | Most users; standard desktop analysis |
 | `hybrid` | \<1 min Phase 1 + variable Phase 2 | Mismatch (all guides) + bulge refinement (recommended pairs only) | Above + CRISPRitz CLI (conda/WSL) | Users wanting bulge sensitivity on final selections |
 | `crispritz` | \~15s per guide (indexed, bMax=1) | Mismatch + DNA/RNA bulges (all guides) | CRISPRitz CLI (conda/WSL) | HPC / advanced users; comprehensive analysis |
@@ -420,7 +420,7 @@ result <- run_mutateR(
 Key parameters for off-target scoring in `run_mutateR()`:
 
 | Parameter | Default | Description |
-|----|----|----|
+|------------------------|------------------------|------------------------|
 | `offtarget` | `TRUE` | Master switch for off-target analysis. |
 | `ot_backend` | `"bowtie"` | Search backend (`"bowtie"`, `"hybrid"`, or `"crispritz"`). |
 | `max_mismatches` | `3` | Maximum mismatches (clamped to 3 for Bowtie). |
@@ -499,7 +499,7 @@ Both are cached persistently in `tools::R_user_dir("mutateR", "cache")` and reus
 Approximate disk usage for hg38 (haven't yet checked expense for other genomes):
 
 | Component | Size | When created |
-|----|----|----|
+|------------------------|------------------------|------------------------|
 | Genome FASTA cache | 2.91 GB | First off-target run (any backend) |
 | Bowtie index | 2.93 GB | First Bowtie/hybrid run |
 | CRISPRitz TST index (bMax=1) | \~6.5 GB (varies depending on `bMax`) | First CRISPRitz/hybrid run |
@@ -574,7 +574,7 @@ For transparency, the following is how `mutateR` scores and aggregates off-targe
 
 -   **Bulge hits:** For alignments containing DNA or RNA bulges, the CFD score is computed on the aligned (length-matched) portion of the sequences, then multiplied by a bulge penalty: $\text{CFD} \times \text{bulge penalty}^\text{bulge size}$ (default `bulge_penalty = 0.2`). This assumes each nucleotide of bulge substantially reduces cutting efficiency.
 
--   **Non-Cas9 nucleases:** The Hsu CFD matrix is Cas9-specific. For Cas12a and enCas12a, `mutateR` uses a simple mismatch-count heuristic ($0.5^{\text{n\_mismatches}}$) as a placeholder. Dedicated Cas12a off-target scoring matrices may be integrated in future (assuming someone is working on this problem - it's kind of beyond my remit). I am aware of <https://pmc.ncbi.nlm.nih.gov/articles/PMC10581463/> and will check it and other literature for suitability when I can.
+-   **Non-Cas9 nucleases:** The Hsu CFD matrix is Cas9-specific. For Cas12a and enCas12a, `mutateR` uses a simple mismatch-count heuristic ($0.5^{\text{mismatches}}$) as a placeholder. Dedicated Cas12a off-target scoring matrices may be integrated in future (assuming someone is working on this problem - it's kind of beyond my remit). I am aware of <https://pmc.ncbi.nlm.nih.gov/articles/PMC10581463/> and will check it and other literature for suitability when I can.
 
 -   **MIT specificity aggregation:** Per-gRNA specificity is computed as $\frac{100}{(1 + \Sigma{CFD})}$ across all off-target hits, where the on-target site (identified by a ±10 bp positional window) is excluded.
 
@@ -647,7 +647,6 @@ You may wish to call lower-level functions directly (*e.g.*, for use in other pr
 ## To be implemented
 
 -   More nucleases (maybe from CasPEDIA or similar?)
--   All `crisprScore` scoring methods - Work in progress
 -   Constitutive exon filtering (to prioritise exons present in all protein-coding isoforms)
 -   Vendor-ready export - format gRNA lists for oligo synthesis vendors (*e.g.* IDT, pending checking with them that this is fine)
 -   Cross-species sequence/domain conservation scoring/visualisation (PhastCons integration)

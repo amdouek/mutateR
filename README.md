@@ -353,8 +353,6 @@ tp53_res <- run_mutateR(
 #> Assembling valid gRNA pairs for TP53 ...
 #> Assembling gRNA pairs for exon‑flanking deletions...
 #> Detected probability-like scores (ruleset1). Using default cutoff: 0.5
-#> Ensembl site unresponsive, trying asia mirror
-#> Ensembl site unresponsive, trying useast mirror
 #> Retrieving InterPro domain annotations from Ensembl Genes mart...
 #> Generated 2784 candidate exon‑flanking gRNA pairs.
 #> Designing genotyping primers for 35 recommended pairs...
@@ -3523,7 +3521,7 @@ off-target hits:
 
 - **Non-Cas9 nucleases:** The Hsu CFD matrix is Cas9-specific. For
   Cas12a and enCas12a, `mutateR` uses a simple mismatch-count heuristic
-  ($0.5^{\text{n\_mismatches}}$) as a placeholder. Dedicated Cas12a
+  ($0.5^{\text{mismatches}}$) as a placeholder. Dedicated Cas12a
   off-target scoring matrices may be integrated in future (assuming
   someone is working on this problem - it’s kind of beyond my remit). I
   am aware of <https://pmc.ncbi.nlm.nih.gov/articles/PMC10581463/> and
@@ -3605,6 +3603,7 @@ opn4.1 <- run_mutateR(gene_id = 'opn4.1',
                      offtarget = FALSE)
 #> Retrieving gene/transcript information...
 #> Using transcript: ENSDART00000018501 for gene: opn4.1
+#> Ensembl site unresponsive, trying useast mirror
 #> Locating Cas9 target sites (PAM: NGG)...
 #> PAM distribution:
 #> 
@@ -4471,7 +4470,6 @@ function.
 ## To be implemented
 
 - More nucleases (maybe from CasPEDIA or similar?)
-- All `crisprScore` scoring methods - Work in progress
 - Constitutive exon filtering (to prioritise exons present in all
   protein-coding isoforms)
 - Vendor-ready export - format gRNA lists for oligo synthesis vendors
@@ -4513,7 +4511,7 @@ sessionInfo()
 #> [13] GenomicRanges_1.62.1                GenomeInfoDb_1.46.2                
 #> [15] Seqinfo_1.0.0                       IRanges_2.44.0                     
 #> [17] S4Vectors_0.49.1-1                  BiocGenerics_0.56.0                
-#> [19] generics_0.1.4                      mutateR_0.1.1                      
+#> [19] generics_0.1.4                      mutateR_0.2.0                      
 #> [21] reticulate_1.46.0                  
 #> 
 #> loaded via a namespace (and not attached):

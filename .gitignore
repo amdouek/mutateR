@@ -1,2 +1,42 @@
+# R project files
 .Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+# Vignettes build output
 inst/doc
+vignettes/*.html
+vignettes/*.pdf
+vignettes/*.R
+
+# Roxygen/documentation build
+man/*.Rd.bak
+
+# knitr / Rmd cache and output
+**/*_cache/
+**/*_files/
+*.knit.md
+*.utf8.md
+
+# testthat artefacts
+tests/testthat/_snaps/
+
+# Python backend
+# Byte-compiled / cached files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# Distribution / packaging
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# Virtual environments
+.venv/
+env/
+venv/
