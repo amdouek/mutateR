@@ -53,7 +53,12 @@ check_exon_phase <- function(exon_info, include_contiguous = FALSE) {
   names(merged)[ncol(merged)] <- "start_phase_3p"
 
   # ----- Compatibility check -----
-  merged$compatible <- merged$end_phase_5p == merged$start_phase_3p
+  # Both phases must be in {0, 1, 2}: phase -1 denotes a non-coding (UTR) exon
+  # in Ensembl and is not a valid CDS splice junction. Without this guard,
+  # two UTR exons (both phase -1) would be flagged compatible.
+  merged$compatible <- merged$end_phase_5p == merged$start_phase_3p &
+                       merged$end_phase_5p   %in% 0:2 &
+                       merged$start_phase_3p %in% 0:2
 
   # ----- Remove contiguous pairs (as default behaviour) -----
   if (!include_contiguous) {

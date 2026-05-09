@@ -6,8 +6,7 @@
 \usage{
 score_grnas(
   grna_gr,
-  method = c("ruleset1", "azimuth", "ruleset3", "deepspcas9", "deephf", "deepcpf1",
-    "enpamgb"),
+  method = c("ruleset1", "ruleset3", "deepspcas9", "deephf", "deepcpf1", "enpamgb"),
   tracr = "Chen2013",
   deephf_var = c("wt_u6", "wt_t7", "wt", "esp", "hf")
 )

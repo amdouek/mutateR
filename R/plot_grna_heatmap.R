@@ -62,15 +62,19 @@ plot_grna_heatmap <- function(exon_gr,
   )
 
   ## ----- 3. Retrieve domain annotations -----
-  domain_df <- tryCatch(
-    map_protein_domains(transcript_id,
-                        species = species,
-                        source = "pfam"),
-    error = function(e) {
-      message("Domain retrieval failed for transcript ", transcript_id, ": ", e$message)
-      NULL
-    }
-  )
+  # Use cached domain_df from assemble_grna_pairs if available (avoids second REST call)
+  domain_df <- if (!is.null(pairs_df)) attr(pairs_df, "domain_df") else NULL
+  if (is.null(domain_df)) {
+    domain_df <- tryCatch(
+      map_protein_domains(transcript_id,
+                          species = species,
+                          source = "pfam"),
+      error = function(e) {
+        message("Domain retrieval failed for transcript ", transcript_id, ": ", e$message)
+        NULL
+      }
+    )
+  }
 
   domain_plot_df <- data.frame()
   if (!is.null(domain_df) && nrow(domain_df) > 0) {

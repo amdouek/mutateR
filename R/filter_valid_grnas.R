@@ -8,7 +8,7 @@
 #' @param genome   BSgenome object for the relevant species.
 #' @param species  Character, using short-form species name e.g. "hsapiens".
 #' @param nuclease Character. One of "Cas9", "Cas12a" or "enCas12a".
-#' @param score_method Character. One of "ruleset1", "azimuth", "deepspcas9",
+#' @param score_method Character. One of "ruleset1", "deepspcas9",
 #'        "deephf", "ruleset3" (Cas9), "deepcpf1" (Cas12a), or "enpamgb" (enCas12a).
 #' @param scored_grnas Precomputed on-target scores passed from elsewhere (default NULL, evokes scoring).
 #' @param tracr Character. Either "Chen2013" (default) or "Hsu2013" - only for ruleset3 scoring.
@@ -21,7 +21,7 @@ filter_valid_grnas <- function(exon_gr,
                                genome,
                                species,
                                nuclease = c("Cas9", "Cas12a", "enCas12a"),
-                               score_method = c("ruleset1", "azimuth", "deepspcas9",
+                               score_method = c("ruleset1", "deepspcas9",
                                                 "deephf", "ruleset3",
                                                 "deepcpf1", "enpamgb"),
                                scored_grnas = NULL,
@@ -33,7 +33,7 @@ filter_valid_grnas <- function(exon_gr,
   deephf_var <- match.arg(deephf_var)
 
   # ---- Validate nuclease/score_method compatibility ----
-  cas9_methods <- c("ruleset1", "azimuth", "deepspcas9", "deephf", "ruleset3")
+  cas9_methods <- c("ruleset1", "deepspcas9", "deephf", "ruleset3")
   cas12a_methods <- c("deepcpf1")
   encas12a_methods <- c("enpamgb")
 
@@ -58,7 +58,12 @@ filter_valid_grnas <- function(exon_gr,
   if (n_exons <= 2) {
     warning("Transcript has ", n_exons, " exon(s). Skipping phase‑compatibility checks.")
 
-    # Find sites based on nuclease
+    if (!is.null(scored_grnas)) {
+      # Use pre-scored GRanges directly (preserves off-target columns from run_mutateR)
+      return(scored_grnas)
+    }
+
+    # Fallback: standalone call without pre-scored GRanges
     grna_sites <- switch(nuclease,
                          "Cas9" = find_cas9_sites(exon_gr, genome),
                          "Cas12a" = find_cas12a_sites(exon_gr, genome, pam = "TTTV"),

@@ -1,3 +1,8 @@
+# Package-level session cache for biomaRt results.
+# Keyed by paste(id, species, sep = "|"). Persists for the R session only.
+# Both get_gene_info() and get_exon_structures() read/write this environment.
+.mutater_biomart_cache <- new.env(hash = TRUE, parent = emptyenv())
+
 #' @title Retrieve transcript information for a selected gene from a given species
 #'
 #' @description Queries Ensembl via biomaRt to retrieve transcript annotation for a given
@@ -30,6 +35,11 @@ get_gene_info <- function(gene_id, species, id_type = c("symbol", "ensembl_gene_
   }
   if (!requireNamespace("biomaRt", quietly = TRUE)) {
     stop("The 'biomaRt' package is required but not installed. Please install it via Bioconductor.")
+  }
+
+  cache_key <- paste(gene_id, species, id_type, sep = "|")
+  if (exists(cache_key, envir = .mutater_biomart_cache, inherits = FALSE)) {
+    return(get(cache_key, envir = .mutater_biomart_cache, inherits = FALSE))
   }
 
   ensembl <- biomaRt::useEnsembl(biomart = "genes",
@@ -67,6 +77,8 @@ get_gene_info <- function(gene_id, species, id_type = c("symbol", "ensembl_gene_
                                           transcripts$ensembl_transcript_id), ]
 
   # ----- Return both 'canonical' and 'all' data.frames as a list -----
-  return(list(canonical = if (nrow(canonical_df) > 0) canonical_df else NULL,
-              all = transcripts_sorted))
+  result <- list(canonical = if (nrow(canonical_df) > 0) canonical_df else NULL,
+                 all = transcripts_sorted)
+  assign(cache_key, result, envir = .mutater_biomart_cache)
+  return(result)
 }

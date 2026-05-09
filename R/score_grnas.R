@@ -25,7 +25,7 @@
 #' @return GRanges with added metadata columns `ontarget_score` and `scoring_method`.
 #' @export
 score_grnas <- function(grna_gr,
-                        method = c("ruleset1", "azimuth", "ruleset3",
+                        method = c("ruleset1", "ruleset3",
                                    "deepspcas9", "deephf",
                                    "deepcpf1", "enpamgb"),
                         tracr = "Chen2013",
@@ -62,18 +62,6 @@ score_grnas <- function(grna_gr,
   if (tolower(method) == "ruleset1") {
     if (!requireNamespace("crisprScore", quietly = TRUE)) stop("crisprScore required.")
     scores_raw <- crisprScore::getRuleSet1Scores(toupper(seqs))
-  }
-
-  # Azimuth - not yet tested for functionality - TO DO
-  if (tolower(method) == "azimuth") {
-    if (!requireNamespace("crisprScore", quietly = TRUE)) stop("crisprScore required.")
-    valid_idx <- substring(seqs, 26, 27) == "GG"
-    scores_vec <- rep(NA_real_, length(seqs))
-    if (any(valid_idx)) {
-      az <- crisprScore::getAzimuthScores(toupper(seqs[valid_idx]))
-      scores_vec[valid_idx] <- extract_numeric_scores(az)
-    }
-    scores_raw <- scores_vec
   }
 
   # Rule Set 3 (via Python backend)

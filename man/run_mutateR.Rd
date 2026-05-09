@@ -46,9 +46,11 @@ run_mutateR(
 \item{transcript_id}{Optional Ensembl transcript ID to override canonical.}
 
 \item{score_method}{Character. On‑target scoring model. If NULL (default), autoselects:
-- Cas9: "ruleset1" (alternatives: "azimuth", "deephf", "deepspcas9", "ruleset3")
-- Cas12a: "deepcpf1"
-- enCas12a: "enpamgb"}
+\itemize{
+\item Cas9: "ruleset1" (alternatives: "deephf", "deepspcas9", "ruleset3")
+\item Cas12a: "deepcpf1"
+\item enCas12a: "enpamgb"
+}}
 
 \item{tracr}{Character. For Rule Set 3 scoring - one of "Chen2013" (default) or "Hsu2013".}
 
@@ -58,9 +60,11 @@ experimental design (delivery method, Cas9 variant).}
 
 \item{min_score}{Numeric. Optional override for on-target score cutoff.
 If NULL (default), auto-selects based on scoring method:
-- DeepCpf1/DeepSpCas9: 50 (percentage scale)
-- RuleSet1/Azimuth/enPAM+GB/DeepHF: 0.5 (probability-like scale)
-- RuleSet3: 0.1 (z-score scale)}
+\itemize{
+\item DeepCpf1/DeepSpCas9: 50 (percentage scale)
+\item RuleSet1/Azimuth/enPAM+GB/DeepHF: 0.5 (probability-like scale)
+\item RuleSet3: 0.1 (z-score scale)
+}}
 
 \item{offtarget}{Logical. Whether to run genome-wide off-target analysis
 (default TRUE). Set to FALSE for faster runs during prototyping.}

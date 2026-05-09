@@ -14,7 +14,7 @@
 #' @param nuclease Character. One of "Cas9" (NGG PAM), "Cas12a" (TTTV PAM), or "enCas12a" (TTTN PAM). Defaults to "Cas9".
 #' @param transcript_id Optional Ensembl transcript ID to override canonical.
 #' @param score_method Character. On‑target scoring model. If NULL (default), autoselects:
-#'        - Cas9: "ruleset1" (alternatives: "azimuth", "deephf", "deepspcas9", "ruleset3")
+#'        - Cas9: "ruleset1" (alternatives: "deephf", "deepspcas9", "ruleset3")
 #'        - Cas12a: "deepcpf1"
 #'        - enCas12a: "enpamgb"
 #' @param tracr Character. For Rule Set 3 scoring - one of "Chen2013" (default) or "Hsu2013".
@@ -456,12 +456,9 @@ run_mutateR <- function(gene_id,
     }
   )
 
-  ## ----- Step 6A: Intragenic mode detection & unpacking (prelim, to develop further) -----
-  intragenic_mode <- FALSE
-  if (is.list(pairs_df) && "pairs" %in% names(pairs_df)) {
-    pairs_df <- pairs_df$pairs
-    intragenic_mode <- TRUE
-    if (!quiet) message("Detected intragenic assembly mode (≤2 exons).")
+  ## ----- Step 6A: Intragenic mode detection -----
+  if (isTRUE(attr(pairs_df, "intragenic_mode")) && !quiet) {
+    message("Detected intragenic assembly mode (≤2 exons).")
   }
 
   ## ----- Step 6B: Bulge refinement (Phase 2) -----
@@ -539,13 +536,21 @@ run_mutateR <- function(gene_id,
       error = function(e) {
         warning("Phase 2 bulge refinement failed: ", e$message,
                 "\nRetaining Phase 1 specificity scores.")
+        if (!quiet) message("Phase 2 fallback: retaining Bowtie Phase 1 specificity scores. ",
+                            "Reason: ", conditionMessage(e))
         NULL
       }
     )
 
     if (!is.null(refinement)) {
-      pairs_df      <- refinement$pairs
-      scored_grnas  <- refinement$scored_grnas
+      old_details      <- attr(scored_grnas, "offtarget_details")
+      old_details_path <- attr(scored_grnas, "offtarget_details_path")
+      pairs_df         <- refinement$pairs
+      scored_grnas     <- refinement$scored_grnas
+      if (is.null(attr(scored_grnas, "offtarget_details")))
+        attr(scored_grnas, "offtarget_details") <- old_details
+      if (is.null(attr(scored_grnas, "offtarget_details_path")))
+        attr(scored_grnas, "offtarget_details_path") <- old_details_path
     }
   }
 

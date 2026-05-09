@@ -134,7 +134,9 @@ assemble_grna_pairs <- function(grna_gr,
                                      ontarget_score_3p >= score_cutoff &
                                      (is.na(pair_specificity) | pair_specificity >= min_pair_specificity))
 
-    return(list(pairs = intragenic[intragenic$recommended == TRUE, ], intragenic_mode = TRUE))
+    out <- intragenic[intragenic$recommended == TRUE, ]
+    attr(out, "intragenic_mode") <- TRUE
+    return(out)
   }
 
   # ---- 4. Multi-exon logic ----
@@ -271,6 +273,16 @@ assemble_grna_pairs <- function(grna_gr,
                  "seqnames_3p", "start_3p", "end_3p", "cut_site_3p")
   out <- out[, intersect(names(out), keep_cols), drop = FALSE]
 
+  missing_cols <- setdiff(keep_cols, names(out))
+  if (length(missing_cols) > 0) {
+    warning("assemble_grna_pairs: expected columns absent from output: ",
+            paste(missing_cols, collapse = ", "))
+  }
+
   message("Generated ", nrow(out), " candidate exon‑flanking gRNA pairs.")
+
+  # Attach domain_df so plot functions can reuse it without a second REST call
+  attr(out, "domain_df") <- domain_df
+
   return(out)
 }

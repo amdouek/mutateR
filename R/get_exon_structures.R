@@ -37,6 +37,11 @@ get_exon_structures <- function(transcript_id, species,
     stop("The 'biomaRt' package is required. Please install it via Bioconductor.")
   }
 
+  cache_key <- paste(transcript_id, species, output, sep = "|")
+  if (exists(cache_key, envir = .mutater_biomart_cache, inherits = FALSE)) {
+    return(get(cache_key, envir = .mutater_biomart_cache, inherits = FALSE))
+  }
+
   ensembl <- biomaRt::useEnsembl(biomart = "genes",
                                  dataset = paste0(species, "_gene_ensembl"))
 
@@ -92,6 +97,7 @@ get_exon_structures <- function(transcript_id, species,
 
   # ----- Output as data.frame -----
   if (output == "data.frame") {
+    assign(cache_key, exons, envir = .mutater_biomart_cache)
     return(exons)
   }
 
@@ -114,5 +120,6 @@ get_exon_structures <- function(transcript_id, species,
                                  "exon_chrom_end",
                                  "strand"))]
 
+  assign(cache_key, gr, envir = .mutater_biomart_cache)
   return(gr)
 }

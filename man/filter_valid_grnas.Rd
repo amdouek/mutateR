@@ -9,8 +9,7 @@ filter_valid_grnas(
   genome,
   species,
   nuclease = c("Cas9", "Cas12a", "enCas12a"),
-  score_method = c("ruleset1", "azimuth", "deepspcas9", "deephf", "ruleset3", "deepcpf1",
-    "enpamgb"),
+  score_method = c("ruleset1", "deepspcas9", "deephf", "ruleset3", "deepcpf1", "enpamgb"),
   scored_grnas = NULL,
   tracr = "Chen2013",
   deephf_var = c("wt_u6", "wt_t7", "wt", "esp", "hf")
@@ -25,7 +24,7 @@ filter_valid_grnas(
 
 \item{nuclease}{Character. One of "Cas9", "Cas12a" or "enCas12a".}
 
-\item{score_method}{Character. One of "ruleset1", "azimuth", "deepspcas9",
+\item{score_method}{Character. One of "ruleset1", "deepspcas9",
 "deephf", "ruleset3" (Cas9), "deepcpf1" (Cas12a), or "enpamgb" (enCas12a).}
 
 \item{scored_grnas}{Precomputed on-target scores passed from elsewhere (default NULL, evokes scoring).}

@@ -10,6 +10,6 @@ Description: Tools to design and prioritise Cas9 and Cas12a guide RNA pairs that
 License: GPL (>= 3)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.3
 Config/testthat/edition: 3
 VignetteBuilder: knitr
+Config/roxygen2/version: 8.0.0
