@@ -53,30 +53,43 @@ assemble_grna_pairs <- function(grna_gr,
   message("Assembling gRNA pairs for exon‑flanking deletions...")
 
   # ---- 1. Determine score cutoff ----
+  method <- if ("scoring_method" %in% names(mcols(grna_gr))) {
+    unique(mcols(grna_gr)$scoring_method)[1]
+  } else {
+    "ruleset1"
+  }
+  scoring_skipped <- !is.na(method) && method == "none"
+
   if (is.null(score_cutoff)) {
-    # Check metadata for scoring method
-    method <- if ("scoring_method" %in% names(mcols(grna_gr))) unique(mcols(grna_gr)$scoring_method)[1] else "ruleset1"
-
-    # Define model categories by output type
-    # Regression models output raw indel percentages (0-100 scale)
-    regression_models <- c("deepcpf1", "deepspcas9")
-
-    # Z-score models output standardised activity scores (centered ~0)
-    zscore_models <- c("ruleset3")
-
-    # Probability-like models output normalised scores (~0-1 scale)
-    # Note: enpamgb can slightly exceed 1.0 (or be negative) due to unconstrained regression
-    probability_models <- c("ruleset1", "azimuth", "enpamgb")
-
-    if (!is.na(method) && tolower(method) %in% regression_models) {
-      score_cutoff <- 50
-      message("Detected linear regression scores (", method, "). Using default cutoff: ", score_cutoff)
-    } else if (!is.na(method) && tolower(method) %in% zscore_models) {
-      score_cutoff <- 0.1
-      message("Detected z-scored activity model (", method, "). Using default cutoff: ", score_cutoff)
+    if (scoring_skipped) {
+      # Custom nuclease path: no on-target scoring performed.
+      # Set cutoff to -Inf so all pairs pass the score gate; downstream
+      # geometric and biological filters still apply.
+      score_cutoff <- -Inf
+      message("No on-target scoring performed (scoring_method='none'); ",
+              "score cutoff disabled.")
     } else {
-      score_cutoff <- 0.5
-      message("Detected probability-like scores (", method, "). Using default cutoff: ", score_cutoff)
+      # Define model categories by output type
+      # Regression models output raw indel percentages (0-100 scale)
+      regression_models <- c("deepcpf1", "deepspcas9")
+
+      # Z-score models output standardised activity scores (centered ~0)
+      zscore_models <- c("ruleset3")
+
+      # Probability-like models output normalised scores (~0-1 scale)
+      # Note: enpamgb can slightly exceed 1.0 (or be negative) due to unconstrained regression
+      probability_models <- c("ruleset1", "azimuth", "enpamgb")
+
+      if (!is.na(method) && tolower(method) %in% regression_models) {
+        score_cutoff <- 50
+        message("Detected linear regression scores (", method, "). Using default cutoff: ", score_cutoff)
+      } else if (!is.na(method) && tolower(method) %in% zscore_models) {
+        score_cutoff <- 0.1
+        message("Detected z-scored activity model (", method, "). Using default cutoff: ", score_cutoff)
+      } else {
+        score_cutoff <- 0.5
+        message("Detected probability-like scores (", method, "). Using default cutoff: ", score_cutoff)
+      }
     }
   }
 
@@ -118,6 +131,21 @@ assemble_grna_pairs <- function(grna_gr,
       stringsAsFactors = FALSE
     )
 
+    # Preserve staggered-cut geometry when available (custom NucleaseSpec path).
+    # These columns are NULL for canonical Cas9/Cas12a finders and harmless to omit.
+    if ("cut_site_top" %in% names(site_df)) {
+      intragenic$cut_site_top_5p    <- site_df$cut_site_top[comb_idx[1,]]
+      intragenic$cut_site_top_3p    <- site_df$cut_site_top[comb_idx[2,]]
+    }
+    if ("cut_site_bottom" %in% names(site_df)) {
+      intragenic$cut_site_bottom_5p <- site_df$cut_site_bottom[comb_idx[1,]]
+      intragenic$cut_site_bottom_3p <- site_df$cut_site_bottom[comb_idx[2,]]
+    }
+    if ("nuclease" %in% names(site_df)) {
+      intragenic$nuclease_5p <- site_df$nuclease[comb_idx[1,]]
+      intragenic$nuclease_3p <- site_df$nuclease[comb_idx[2,]]
+    }
+
     # Ensure off-target columns exist (NA if off-target scoring was not run)
     if (!"specificity_score_5p" %in% names(intragenic)) intragenic$specificity_score_5p <- NA_real_
     if (!"specificity_score_3p" %in% names(intragenic)) intragenic$specificity_score_3p <- NA_real_
@@ -129,9 +157,13 @@ assemble_grna_pairs <- function(grna_gr,
       intragenic$specificity_score_3p
     )
 
+    # `recommended`: on-target scores pass cutoff AND pair specificity passes
+    # threshold. When scoring was skipped (custom NucleaseSpec), on-target
+    # scores are NA throughout and the cutoff has been set to -Inf — treat
+    # NA scores as passing the score gate.
     intragenic$recommended <- with(intragenic,
-                                   ontarget_score_5p >= score_cutoff &
-                                     ontarget_score_3p >= score_cutoff &
+                                   (scoring_skipped | (!is.na(ontarget_score_5p) & ontarget_score_5p >= score_cutoff)) &
+                                     (scoring_skipped | (!is.na(ontarget_score_3p) & ontarget_score_3p >= score_cutoff)) &
                                      (is.na(pair_specificity) | pair_specificity >= min_pair_specificity))
 
     out <- intragenic[intragenic$recommended == TRUE, ]
@@ -252,14 +284,19 @@ assemble_grna_pairs <- function(grna_gr,
     out$specificity_score_3p
   )
 
-  # Recommended: on-target scores pass method cutoff AND pair specificity passes threshold
-  # is.na() guard preserves backwards compatibility when off-target scoring is skipped
+  # Recommended: on-target scores pass method cutoff AND pair specificity passes threshold.
+  # is.na() guard preserves backwards compatibility when off-target scoring is skipped.
+  # When on-target scoring was skipped (custom NucleaseSpec), NA on-target scores
+  # are treated as passing the (disabled) score gate.
   out$recommended <- with(out,
-                          !is.na(ontarget_score_5p) & ontarget_score_5p >= score_cutoff &
-                            !is.na(ontarget_score_3p) & ontarget_score_3p >= score_cutoff &
+                          (scoring_skipped | (!is.na(ontarget_score_5p) & ontarget_score_5p >= score_cutoff)) &
+                            (scoring_skipped | (!is.na(ontarget_score_3p) & ontarget_score_3p >= score_cutoff)) &
                             (is.na(pair_specificity) | pair_specificity >= min_pair_specificity))
 
-  # Keep columns
+  # Keep columns. cut_site_top_* and cut_site_bottom_* are emitted by
+  # find_custom_grna_sites() to preserve stagger geometry for users who need
+  # accurate strand-break reporting; they are retained here when present and
+  # silently dropped when absent (canonical Cas9 / Cas12a paths).
   keep_cols <- c("upstream_pair","downstream_pair","exon_5p","exon_3p",
                  "compatible","frameshift","ptc_flag","terminal_exon_case",
                  "genomic_deletion_size", "transcript_deletion_size",
@@ -270,7 +307,10 @@ assemble_grna_pairs <- function(grna_gr,
                  "pair_specificity",
                  "domains","recommended",
                  "seqnames_5p", "start_5p", "end_5p", "cut_site_5p",
-                 "seqnames_3p", "start_3p", "end_3p", "cut_site_3p")
+                 "cut_site_top_5p", "cut_site_bottom_5p",
+                 "seqnames_3p", "start_3p", "end_3p", "cut_site_3p",
+                 "cut_site_top_3p", "cut_site_bottom_3p",
+                 "nuclease_5p", "nuclease_3p")
   out <- out[, intersect(names(out), keep_cols), drop = FALSE]
 
   missing_cols <- setdiff(keep_cols, names(out))

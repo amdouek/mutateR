@@ -46,16 +46,40 @@ find_cas9_sites <- function(exon_gr,
       if (strand_sign == "+") {
         seq_to_scan <- exon_seq
         offset_func <- function(hit_start, hit_end)
-          list(start = start(gr) + hit_start - protospacer_length - 1,
-               end   = start(gr) + hit_end - 1) #  Scan the forward strand (of the transcript, not genomic)
+          list(start    = start(gr) + hit_start - protospacer_length - 1,
+               end      = start(gr) + hit_end - 1,
+               cut_site = start(gr) + hit_start - protospacer_length - 1 +
+                            protospacer_length - 3)
+        #  Scan the forward strand (of the transcript, not genomic).
+        #  On the + strand the protospacer occupies positions
+        #  [hit_start - proto_len, hit_start - 1] of exon_seq; the genomic
+        #  range of the (proto + PAM) hit therefore runs from
+        #  start(gr) + hit_start - proto_len - 1 (proto 5') to
+        #  start(gr) + hit_end - 1 (PAM 3'). The blunt SpCas9 cut sits 3 nt
+        #  upstream of the PAM, i.e. at proto position 18 from the 5' end.
       } else {
         seq_to_scan <- Biostrings::reverseComplement(exon_seq)
         offset_func <- function(hit_start, hit_end) {
-          pam_end_genomic <- end(gr) - (hit_start - 1)
-          pam_start_genomic <- pam_end_genomic -
-            (protospacer_length + nchar(pam) - 1)
-          list(start = pam_start_genomic,
-               end   = pam_end_genomic) #  Reverse complement the exons, then scan as above
+          # `pam_end_genomic` is named for symmetry with the + strand block
+          # but in fact represents the *high* genomic coord of the PAM on the
+          # minus strand — i.e. the PAM 5' nucleotide when reading the target
+          # strand 5'→3'. On the minus strand target reads high→low in
+          # genomic coords, so the (proto + PAM) range lays out as:
+          #   genomic low  = PAM 3' on target = pam_end_genomic - pam_len + 1
+          #   genomic high = proto 5' on target = pam_end_genomic + proto_len
+          # (Previous versions placed the range pam_len + proto_len - 1 bp
+          # *below* the PAM, which put it 22 bp downstream of the actual
+          # protospacer; cut_site was also off by 8 bp on the minus strand.)
+          pam_end_genomic   <- end(gr) - (hit_start - 1)
+          pam_len_n         <- nchar(pam)
+          range_lo_genomic  <- pam_end_genomic - pam_len_n + 1L
+          range_hi_genomic  <- pam_end_genomic + protospacer_length
+          # Blunt cut 3 nt 5' of the PAM on target = 3 nt above the PAM in
+          # genomic coords on the minus strand.
+          cut_genomic       <- pam_end_genomic + 3L
+          list(start    = range_lo_genomic,
+               end      = range_hi_genomic,
+               cut_site = cut_genomic)
         }
       }
 
@@ -98,7 +122,7 @@ find_cas9_sites <- function(exon_gr,
           protospacer_sequence = as.character(protospacer),
           pam_sequence          = as.character(pam_seq_str),
           target_sequence       = as.character(paste0(protospacer, pam_seq_str)),
-          cut_site              = coords$start + protospacer_length - 3,
+          cut_site              = coords$cut_site,
           sequence_context      = as.character(ctx)
         )
 

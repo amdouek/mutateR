@@ -11,7 +11,14 @@
 #' @param gene_id Character. Gene symbol or Ensembl Gene ID (ENSG...).
 #' @param species Character. e.g. "hsapiens", "mmusculus", "drerio".
 #' @param genome  BSgenome object (e.g. BSgenome.Hsapiens.UCSC.hg38).
-#' @param nuclease Character. One of "Cas9" (NGG PAM), "Cas12a" (TTTV PAM), or "enCas12a" (TTTN PAM). Defaults to "Cas9".
+#' @param nuclease Either a character string ("Cas9" (NGG PAM), "Cas12a"
+#'        (TTTV PAM), or "enCas12a" (TTTN PAM); defaults to "Cas9") OR a
+#'        \code{NucleaseSpec} object built with \code{\link{nuclease_spec}}.
+#'        When a custom (non-canonical) \code{NucleaseSpec} is supplied,
+#'        on-target and off-target scoring are automatically skipped: the
+#'        pipeline runs site-finding, phase filtering, pair assembly, primer
+#'        design, and plotting only. For lightweight site-scanning with a
+#'        custom nuclease, see also \code{\link{run_mutateR_custom}}.
 #' @param transcript_id Optional Ensembl transcript ID to override canonical.
 #' @param score_method Character. On‑target scoring model. If NULL (default), autoselects:
 #'        - Cas9: "ruleset1" (alternatives: "deephf", "deepspcas9", "ruleset3")
@@ -211,7 +218,7 @@
 run_mutateR <- function(gene_id,
                         species,
                         genome,
-                        nuclease = c("Cas9", "Cas12a", "enCas12a"),
+                        nuclease = "Cas9",
                         transcript_id = NULL,
                         score_method = NULL,
                         tracr = "Chen2013",
@@ -242,13 +249,41 @@ run_mutateR <- function(gene_id,
   })
 
   plot_mode <- match.arg(plot_mode)
-  nuclease <- match.arg(nuclease)
   deephf_var <- match.arg(deephf_var)
   ot_backend <- match.arg(ot_backend)
   ot_detail_level <- match.arg(ot_detail_level)
 
+  # ---- Normalise nuclease argument (string or NucleaseSpec) ----
+  if (is.character(nuclease)) {
+    nuclease <- match.arg(nuclease, c("Cas9", "Cas12a", "enCas12a"))
+    nuc_spec  <- resolve_nuclease(nuclease)
+    nuc_label <- nuclease
+    is_custom_spec <- FALSE
+  } else if (inherits(nuclease, "NucleaseSpec")) {
+    nuc_spec  <- nuclease
+    nuc_label <- if (isTRUE(nuc_spec$is_canonical)) nuc_spec$canonical_key else nuc_spec$name
+    is_custom_spec <- !isTRUE(nuc_spec$is_canonical)
+    # Re-bind `nuclease` to the canonical string when the spec is canonical,
+    # so the existing switch() calls below still dispatch correctly.
+    if (!is_custom_spec) nuclease <- nuc_spec$canonical_key
+  } else {
+    stop("`nuclease` must be a character string ('Cas9', 'Cas12a', 'enCas12a') ",
+         "or a NucleaseSpec object built with nuclease_spec().")
+  }
+
   if (!inherits(genome, "BSgenome"))
     stop("Please supply a valid BSgenome object.")
+
+  # ---- Custom-spec gating: force-skip scoring stages ----
+  if (is_custom_spec) {
+    if (!quiet) {
+      message("Custom NucleaseSpec '", nuc_spec$name,
+              "' detected. On-target and off-target scoring will be skipped; ",
+              "for lightweight scanning use run_mutateR_custom().")
+    }
+    score_method <- "none"
+    offtarget    <- FALSE
+  }
 
   # ---- Set default scoring method based on nuclease ----
   if (is.null(score_method)) {
@@ -301,26 +336,30 @@ run_mutateR <- function(gene_id,
 
   ## ----- Step 3A: Find gRNAs -----
   if (!quiet) {
-    pam_info <- switch(nuclease,
+    pam_info <- if (is_custom_spec) nuc_spec$pam else switch(nuclease,
                        "Cas9" = "NGG",
                        "Cas12a" = "TTTV",
                        "enCas12a" = "TTTN"
     )
-    message("Locating ", nuclease, " target sites (PAM: ", pam_info, ")...")
+    message("Locating ", nuc_spec$name, " target sites (PAM: ", pam_info, ")...")
   }
 
-  hits <- switch(nuclease,
-                 "Cas9" = find_cas9_sites(exons_gr, genome),
-                 "Cas12a" = find_cas12a_sites(exons_gr, genome, pam = "TTTV"),
-                 "enCas12a" = find_cas12a_sites(exons_gr, genome, pam = "TTTN")
-  )
+  hits <- if (is_custom_spec) {
+    find_custom_grna_sites(exons_gr, genome, nuc_spec, require_full_context = FALSE)
+  } else {
+    switch(nuclease,
+           "Cas9"     = find_cas9_sites(exons_gr, genome),
+           "Cas12a"   = find_cas12a_sites(exons_gr, genome, pam = "TTTV"),
+           "enCas12a" = find_cas12a_sites(exons_gr, genome, pam = "TTTN"))
+  }
 
   if (is.null(hits) || length(hits) == 0) {
-    warning("No gRNA sites identified for ", gene_id, " / ", nuclease)
+    warning("No gRNA sites identified for ", gene_id, " / ", nuc_label)
     return(list(gene_id = gene_id,
                 gene_symbol = gene_symbol,
                 transcript_id = canonical_tx,
-                nuclease = nuclease,
+                nuclease = nuc_label,
+                nuclease_spec = nuc_spec,
                 exons = exons_gr,
                 scored_grnas = NULL,
                 pairs = data.frame(),
@@ -335,19 +374,36 @@ run_mutateR <- function(gene_id,
   }
 
   ## ----- Step 4A: On-target scoring -----
-  if (!quiet) {
-    msg <- paste0("Scoring gRNAs using model: ", score_method)
-    if (score_method == "ruleset3") msg <- paste0(msg, " (tracrRNA: ", tracr, ")")
-    if (score_method == "deephf")   msg <- paste0(msg, " (variant: ", deephf_var, ")")
-    message(msg)
-  }
-
-  scored_grnas <- if (quiet) {
-    suppressMessages(score_grnas(hits, method = score_method,
-                                 tracr = tracr, deephf_var = deephf_var))
+  if (is_custom_spec) {
+    # Custom NucleaseSpec: skip scoring; annotate columns with NA so
+    # downstream consumers see a consistent schema.
+    scored_grnas <- hits
+    GenomicRanges::mcols(scored_grnas)$ontarget_score <- NA_real_
+    GenomicRanges::mcols(scored_grnas)$scoring_method <- "none"
+    GenomicRanges::mcols(scored_grnas)$gc <- vapply(
+      as.character(GenomicRanges::mcols(scored_grnas)$sequence_context),
+      function(s) {
+        if (is.na(s)) return(NA_real_)
+        chars <- unlist(strsplit(toupper(s), ""))
+        mean(chars %in% c("G", "C"))
+      },
+      numeric(1), USE.NAMES = FALSE
+    )
   } else {
-    score_grnas(hits, method = score_method,
-                tracr = tracr, deephf_var = deephf_var)
+    if (!quiet) {
+      msg <- paste0("Scoring gRNAs using model: ", score_method)
+      if (score_method == "ruleset3") msg <- paste0(msg, " (tracrRNA: ", tracr, ")")
+      if (score_method == "deephf")   msg <- paste0(msg, " (variant: ", deephf_var, ")")
+      message(msg)
+    }
+
+    scored_grnas <- if (quiet) {
+      suppressMessages(score_grnas(hits, method = score_method,
+                                   tracr = tracr, deephf_var = deephf_var))
+    } else {
+      score_grnas(hits, method = score_method,
+                  tracr = tracr, deephf_var = deephf_var)
+    }
   }
 
   ## ----- Step 4B: Off-target scoring -----
@@ -433,7 +489,7 @@ run_mutateR <- function(gene_id,
     suppressWarnings({
       tmp <- capture.output(
         val <- filter_valid_grnas(exons_gr, genome, species,
-                                  nuclease = nuclease,
+                                  nuclease = nuc_spec,
                                   score_method = score_method,
                                   scored_grnas = scored_grnas,
                                   tracr = tracr,
@@ -635,7 +691,7 @@ run_mutateR <- function(gene_id,
     }
 
     message("mutateR pipeline completed for ", gene_id,
-            " (", nuclease, "/", score_method,
+            " (", nuc_label, "/", score_method,
             if (score_method == "deephf") paste0("/", deephf_var) else "",
             ", off-target: ", ot_summary,
             "), finding ",
@@ -647,7 +703,8 @@ run_mutateR <- function(gene_id,
     gene_id = gene_id,
     gene_symbol = gene_symbol,
     transcript_id = canonical_tx,
-    nuclease = nuclease,
+    nuclease = nuc_label,
+    nuclease_spec = nuc_spec,
     score_method = score_method,
     deephf_var = if (score_method == "deephf") deephf_var else NA_character_,
     ot_backend = if (offtarget) ot_backend else NA_character_,
