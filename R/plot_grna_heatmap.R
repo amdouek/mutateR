@@ -124,7 +124,16 @@ plot_grna_heatmap <- function(exon_gr,
         ymax = y_base - offset + 0.25
       )
 
-    domain_cols <- RColorBrewer::brewer.pal(min(max(3, n_domains), 8), "Set2")
+    # One colour per domain. brewer.pal "Set2" caps at 8 colours, so for
+    # transcripts with >8 domains, interpolate to exactly n_domains colours
+    # (otherwise the fill vector is shorter than the data and geom_rect errors:
+    # "Aesthetics must be either length 1 or the same as the data").
+    base_pal <- RColorBrewer::brewer.pal(8, "Set2")
+    domain_cols <- if (n_domains <= length(base_pal)) {
+      base_pal[seq_len(n_domains)]
+    } else {
+      grDevices::colorRampPalette(base_pal)(n_domains)
+    }
 
     # Assign label placement: alternate above/below
     domain_plot_df$label_y <- ifelse(seq_len(n_domains) %% 2 == 1,
@@ -141,7 +150,7 @@ plot_grna_heatmap <- function(exon_gr,
               ymin = ymin,
               ymax = ymax),
           inherit.aes = FALSE,
-          fill = domain_cols[seq_len(min(length(domain_cols), n_domains))],
+          fill = domain_cols,
           colour = "black",
           linewidth = 0.25,
           alpha = 0.85

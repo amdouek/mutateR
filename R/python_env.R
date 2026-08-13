@@ -50,14 +50,57 @@ install_mutater_env <- function(envname = "r-mutater",
   # Note: Pinning numpy<2 is recommended for TensorFlow compatibility
   # Note: TensorFlow pinned to 2.15.x to maintain Keras 2 compatibility
   # (required for loading legacy DeepHF, DeepSpCas9, DeepCpf1 model weights)
-  pkgs <- c("tensorflow-cpu==2.15.0", "numpy<2", "h5py", "pandas", "scipy",
+  #
+  # Platform-specific TensorFlow wheel:
+  #   - macOS (Apple Silicon/Intel): tensorflow-cpu has NO arm64 wheels on PyPI;
+  #     tensorflow-macos==2.15.0 is the correct package (still ships Keras 2).
+  #     (Optional GPU acceleration via tensorflow-metal is not installed here.)
+  #   - Linux/Windows: tensorflow-cpu==2.15.0.
+  tf_pkg <- if (Sys.info()[["sysname"]] == "Darwin") {
+    "tensorflow-macos==2.15.0"
+  } else {
+    "tensorflow-cpu==2.15.0"
+  }
+  pkgs <- c(tf_pkg, "numpy<2", "h5py", "pandas", "scipy",
             "primer3-py", "rs3", "scikit-learn", "biopython", "viennarna")
+
+  # macOS arm64: rs3 pins lightgbm<=3.3.5, and the lightgbm 3.3.x series has no
+  # arm64 wheel on PyPI, so a pip install would build lightgbm from source
+  # (requires CMake + OpenMP and fails with "Please install CMake ..."). conda-forge
+  # ships a prebuilt osx-arm64 lightgbm 3.3.5 (bundling libomp); install it via
+  # conda first so pip sees rs3's lightgbm requirement already satisfied and skips
+  # the source build. No-op on Linux/Windows, where lightgbm has PyPI wheels.
+  if (Sys.info()[["sysname"]] == "Darwin") {
+    message("Installing lightgbm (rs3 dependency) via conda-forge to avoid an ",
+            "arm64 source build...")
+    reticulate::conda_install(envname, packages = "lightgbm=3.3.5",
+                              channel = "conda-forge", pip = FALSE)
+  }
 
   message("Installing packages: ", paste(pkgs, collapse = ", "))
   reticulate::conda_install(envname, packages = pkgs, pip = TRUE)
 
-  # Install CRISPRitz (bioconda - Linux/macOS only; Windows requires separate WSL)
-  if (.Platform$OS.type == "unix") {
+  # Install CRISPRitz for off-target analysis.
+  #
+  # Platform support for CRISPRitz:
+  #   - Linux: original CRISPRitz via bioconda (install attempted below).
+  #   - Windows: NOT installed here. The Windows workflow uses a Python 3.10
+  #     CRISPRitz *reimplementation* routed through WSL (not the bioconda
+  #     original). See the Windows branch below.
+  #   - macOS: NOT available. Bioconda has no osx-arm64 build, and osx-64
+  #     builds require Python <= 3.7 (incompatible with this Python 3.10 env).
+  #     Porting CRISPRitz to macOS would mean porting the WSL reimplementation,
+  #     not installing the original tool — this is future work. On macOS,
+  #     off-target scoring uses the Bowtie backend (Rbowtie) by default.
+  #
+  # NOTE (W4): the bioconda install line below is Linux-only and remains
+  # untested in the macOS port; revisit if/when the reimplementation is ported.
+  sysname <- Sys.info()[["sysname"]]
+  if (sysname == "Darwin") {
+    message("Note: CRISPRitz is not available on macOS.")
+    message("Off-target scoring will use the Bowtie backend (Rbowtie) by default.")
+    message("No CRISPRitz installation will be attempted.")
+  } else if (.Platform$OS.type == "unix") {
      message("Installing CRISPRitz for off-target analysis...")
      conda_bin <- reticulate::conda_binary()
      crispritz_exit <- system2(

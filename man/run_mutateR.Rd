@@ -8,7 +8,7 @@ run_mutateR(
   gene_id,
   species,
   genome,
-  nuclease = c("Cas9", "Cas12a", "enCas12a"),
+  nuclease = "Cas9",
   transcript_id = NULL,
   score_method = NULL,
   tracr = "Chen2013",
@@ -41,7 +41,14 @@ run_mutateR(
 
 \item{genome}{BSgenome object (e.g. BSgenome.Hsapiens.UCSC.hg38).}
 
-\item{nuclease}{Character. One of "Cas9" (NGG PAM), "Cas12a" (TTTV PAM), or "enCas12a" (TTTN PAM). Defaults to "Cas9".}
+\item{nuclease}{Either a character string ("Cas9" (NGG PAM), "Cas12a"
+(TTTV PAM), or "enCas12a" (TTTN PAM); defaults to "Cas9") OR a
+\code{NucleaseSpec} object built with \code{\link{nuclease_spec}}.
+When a custom (non-canonical) \code{NucleaseSpec} is supplied,
+on-target and off-target scoring are automatically skipped: the
+pipeline runs site-finding, phase filtering, pair assembly, primer
+design, and plotting only. For lightweight site-scanning with a
+custom nuclease, see also \code{\link{run_mutateR_custom}}.}
 
 \item{transcript_id}{Optional Ensembl transcript ID to override canonical.}
 

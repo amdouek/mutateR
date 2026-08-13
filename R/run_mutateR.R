@@ -253,6 +253,19 @@ run_mutateR <- function(gene_id,
   ot_backend <- match.arg(ot_backend)
   ot_detail_level <- match.arg(ot_detail_level)
 
+  # CRISPRitz is not available on macOS (see crispritz_supported()). Both the
+  # 'crispritz' and 'hybrid' backends depend on it ('hybrid' for its Phase-2
+  # bulge refinement); on macOS they collapse to mismatch-only Bowtie scoring,
+  # so route to the 'bowtie' backend directly with an informative note.
+  if (ot_backend %in% c("crispritz", "hybrid") && !crispritz_supported()) {
+    if (!quiet) {
+      message("Note: CRISPRitz is not available on macOS; using the Bowtie ",
+              "backend (mismatch-only off-target scoring) instead of '",
+              ot_backend, "'.")
+    }
+    ot_backend <- "bowtie"
+  }
+
   # ---- Normalise nuclease argument (string or NucleaseSpec) ----
   if (is.character(nuclease)) {
     nuclease <- match.arg(nuclease, c("Cas9", "Cas12a", "enCas12a"))

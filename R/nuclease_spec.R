@@ -26,7 +26,7 @@ NULL
 #'        protospacer on the target strand, Cas9-style) or \code{"5prime"}
 #'        (PAM upstream, Cas12a-style).
 #' @param protospacer_length Integer. Length of the protospacer in nucleotides.
-#'        Must be in [10, 40].
+#'        Must be in range (10, 40).
 #' @param cut_offset_top Integer. Signed offset of the top-strand cleavage
 #'        position relative to the protospacer 3' end on the target strand
 #'        (i.e., the protospacer-distal end). Negative values indicate cuts

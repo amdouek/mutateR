@@ -143,6 +143,18 @@ score_offtargets <- function(grna_gr,
     stop("'bulge_penalty' must be a numeric value in (0, 1).")
   }
 
+  # Platform gate: CRISPRitz is not available on macOS (see crispritz_supported()).
+  # Downgrade to the Bowtie backend (mismatch-only) rather than failing deep inside
+  # a CRISPRitz invocation. 'hybrid' already runs its Phase-1 pass via Bowtie, so it
+  # needs no downgrade here; its CRISPRitz bulge-refinement phase is gated separately
+  # in run_mutateR() / refine_with_bulges().
+  if (backend == "crispritz" && !crispritz_supported()) {
+    warning("CRISPRitz is not available on macOS (the CRISPRitz reimplementation ",
+            "has not been ported). Falling back to the Bowtie backend ",
+            "(mismatch-only off-target scoring).", call. = FALSE)
+    backend <- "bowtie"
+  }
+
   # Backend-specific validation
   if (backend == "crispritz") {
     if (!is.numeric(max_dna_bulges) || max_dna_bulges < 0 || max_dna_bulges > 3) {
@@ -1295,6 +1307,15 @@ refine_with_bulges <- function(pairs_df,
   detail_level <- match.arg(detail_level)
 
   # ---- 1. Check CRISPRitz availability ----
+  # Platform gate first: CRISPRitz is not ported to macOS. Skip refinement and
+  # keep the mismatch-only (Bowtie) specificity scores.
+  if (!crispritz_supported()) {
+    if (!quiet) {
+      message("CRISPRitz bulge refinement is not available on macOS. ",
+              "Specificity scores reflect mismatch-only (Bowtie) analysis.")
+    }
+    return(unchanged)
+  }
   if (!check_mutater_env()) {
     warning("mutateR Python environment not available for CRISPRitz bulge refinement.\n",
             "Skipping bulge pass. Specificity scores reflect mismatch-only (Bowtie) analysis.\n",

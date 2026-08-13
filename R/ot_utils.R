@@ -152,6 +152,25 @@ wsl_path <- function(win_path) {
   p
 }
 
+#' Is the CRISPRitz off-target backend available on this platform?
+#'
+#' CRISPRitz runs natively on Linux and, on Windows, via a Python 3.10
+#' reimplementation routed through WSL. It has \emph{not} been ported to
+#' macOS: bioconda ships no \code{osx-arm64} build, and the \code{osx-64}
+#' builds require Python <= 3.7 (incompatible with the Python 3.10 TensorFlow
+#' environment). On macOS, off-target scoring therefore falls back to the
+#' Bowtie backend (mismatch-only, via \code{Rbowtie}).
+#'
+#' Used by \code{\link{score_offtargets}}, \code{run_mutateR()}, and
+#' \code{refine_with_bulges()} to downgrade gracefully rather than failing
+#' deep inside a CRISPRitz invocation.
+#'
+#' @return Logical. \code{TRUE} on Linux/Windows, \code{FALSE} on macOS.
+#' @keywords internal
+crispritz_supported <- function() {
+  Sys.info()[["sysname"]] != "Darwin"
+}
+
 #' Compute linguistic complexity of DNA sequences
 #'
 #' Calculates k-mer diversity as a proxy for sequence repetitiveness.
